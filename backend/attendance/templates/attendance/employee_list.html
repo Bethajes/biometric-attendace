@@ -1,0 +1,39 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>Employee Directory</h2>
+        <a class="button primary" href="{% url 'employee_add' %}">Add Employee</a>
+    </div>
+    <div class="panel-body">
+        <form class="filter-bar" method="get">
+            <label>Search<input name="q" value="{{ request.GET.q }}" placeholder="Name, ID, role, email"></label>
+            <label>Department<select name="department"><option value="">All departments</option>{% for dept in departments %}<option value="{{ dept.id }}" {% if request.GET.department == dept.id|stringformat:"s" %}selected{% endif %}>{{ dept.name }}</option>{% endfor %}</select></label>
+            <label>Status<select name="status"><option value="">All statuses</option>{% for value,label in status_choices %}<option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+            <button class="button primary" type="submit">Apply</button><a class="button subtle" href="{% url 'employee_list' %}">Reset</a>
+        </form>
+        <div class="table-actions" style="margin-bottom:12px;"><a class="button" href="?{{ request.GET.urlencode }}{% if request.GET.urlencode %}&{% endif %}export=csv">CSV</a><a class="button" href="?{{ request.GET.urlencode }}{% if request.GET.urlencode %}&{% endif %}export=excel">Excel</a><a class="button" href="?{{ request.GET.urlencode }}{% if request.GET.urlencode %}&{% endif %}export=pdf">PDF</a></div>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th><a href="?sort=organization_id">ID</a></th><th><a href="?sort=first_name">Employee</a></th><th>Department</th><th>Job Title</th><th>Face</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            {% for employee in object_list %}
+                <tr>
+                    <td>{{ employee.organization_id }}</td>
+                    <td><div class="person-cell"><span class="avatar">{{ employee.first_name|slice:":1" }}{{ employee.last_name|slice:":1" }}</span><div><strong>{{ employee.full_name }}</strong><div class="muted small">{{ employee.email|default:"No email" }}</div></div></div></td>
+                    <td>{{ employee.department|default:"Unassigned" }}</td>
+                    <td>{{ employee.job_title }}</td>
+                    <td><span class="badge {% if employee.face_enrolled %}success{% else %}warning{% endif %}">{% if employee.face_enrolled %}Enrolled{% else %}Pending{% endif %}</span></td>
+                    <td><span class="badge">{{ employee.get_employment_status_display }}</span></td>
+                    <td class="row-actions"><a class="button subtle" href="{{ employee.get_absolute_url }}">Profile</a><a class="button subtle" href="{% url 'employee_edit' employee.pk %}">Edit</a></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="empty">No employees match the current filters.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "attendance/_pagination.html" %}
+</div>
+{% endblock %}

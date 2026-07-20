@@ -1,0 +1,20 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header"><h2>Attendance Records</h2><div class="table-actions"><a class="button" href="?{{ request.GET.urlencode }}{% if request.GET.urlencode %}&{% endif %}export=csv">CSV</a><a class="button" href="?{{ request.GET.urlencode }}{% if request.GET.urlencode %}&{% endif %}export=excel">Excel</a><a class="button" href="?{{ request.GET.urlencode }}{% if request.GET.urlencode %}&{% endif %}export=pdf">PDF</a></div></div>
+    <div class="panel-body">
+        <form class="filter-bar" method="get">
+            <label>Search<input name="q" value="{{ request.GET.q }}" placeholder="Employee, ID, department"></label>
+            <label>Status<select name="status"><option value="">All statuses</option>{% for value,label in status_choices %}<option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+            <label>From<input type="date" name="date_from" value="{{ request.GET.date_from }}"></label>
+            <label>To<input type="date" name="date_to" value="{{ request.GET.date_to }}"></label>
+            <button class="button primary">Apply</button><a class="button subtle" href="{% url 'attendance_records' %}">Reset</a>
+        </form>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Department</th><th>Status</th><th>In</th><th>Out</th><th>Late</th><th>Early</th><th>OT</th><th>Worked</th></tr></thead><tbody>
+    {% for record in object_list %}
+        <tr><td>{{ record.date }}</td><td><strong>{{ record.employee.full_name }}</strong><div class="muted small">{{ record.employee.organization_id }}</div></td><td>{{ record.employee.department|default:"-" }}</td><td><span class="badge {% if record.status == 'ABSENT' %}danger{% elif record.status == 'LATE' or record.status == 'EARLY_LEAVE' %}warning{% else %}success{% endif %}">{{ record.get_status_display }}</span></td><td>{{ record.first_check_in|date:"H:i"|default:"-" }}</td><td>{{ record.last_check_out|date:"H:i"|default:"-" }}</td><td>{{ record.minutes_late }}m</td><td>{{ record.minutes_early_leave }}m</td><td>{{ record.overtime_minutes }}m</td><td>{{ record.worked_minutes }}m</td></tr>
+    {% empty %}<tr><td colspan="10" class="empty">No attendance records match the current filters.</td></tr>{% endfor %}
+    </tbody></table></div>{% include "attendance/_pagination.html" %}
+</div>
+{% endblock %}

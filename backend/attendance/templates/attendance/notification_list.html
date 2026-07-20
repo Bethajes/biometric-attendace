@@ -1,0 +1,12 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header"><h2>Notifications</h2></div>
+    <div class="panel-body"><form class="filter-bar" method="get"><label>Search<input name="q" value="{{ request.GET.q }}" placeholder="Title, message, employee"></label><button class="button primary">Apply</button><a class="button subtle" href="{% url 'notification_list' %}">Reset</a></form></div>
+    <div class="table-wrap"><table><thead><tr><th>Created</th><th>Level</th><th>Title</th><th>Employee</th><th>Read</th></tr></thead><tbody>
+    {% for notification in object_list %}
+        <tr><td>{{ notification.created_at|date:"M d, H:i" }}</td><td><span class="badge {% if notification.level == 'CRITICAL' %}danger{% elif notification.level == 'WARNING' %}warning{% endif %}">{{ notification.get_level_display }}</span></td><td><strong>{{ notification.title }}</strong><div class="muted small">{{ notification.message|truncatechars:80 }}</div></td><td>{{ notification.employee|default:"-" }}</td><td>{{ notification.is_read|yesno:"Yes,No" }}</td></tr>
+    {% empty %}<tr><td colspan="5" class="empty">No notifications.</td></tr>{% endfor %}
+    </tbody></table></div>{% include "attendance/_pagination.html" %}
+</div>
+{% endblock %}

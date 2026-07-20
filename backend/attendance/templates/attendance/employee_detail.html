@@ -1,0 +1,62 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<section class="panel">
+    <div class="panel-header profile-header">
+        <div class="profile-title">
+            <span class="avatar">{{ object.first_name|slice:":1" }}{{ object.last_name|slice:":1" }}</span>
+            <div>
+                <h2>{{ object.full_name }}</h2>
+                <p class="muted">{{ object.organization_id }} · {{ object.job_title }}</p>
+            </div>
+        </div>
+        <div class="row-actions"><a class="button subtle" href="{% url 'employee_edit' object.pk %}">Edit</a><a class="button" href="{% url 'employee_list' %}">Back</a></div>
+    </div>
+    <div class="panel-body">
+        <div class="definition-grid">
+            <div class="definition"><span>Department</span>{{ object.department|default:"Unassigned" }}</div>
+            <div class="definition"><span>Face Enrollment</span><span class="badge {% if object.face_enrolled %}success{% else %}warning{% endif %}">{% if object.face_enrolled %}Enrolled{% else %}Pending{% endif %}</span></div>
+            <div class="definition"><span>Attendance</span>{{ attendance_percentage }}%</div>
+            <div class="definition"><span>Email</span>{{ object.email|default:"-" }}</div>
+            <div class="definition"><span>Phone</span>{{ object.phone|default:"-" }}</div>
+            <div class="definition"><span>Location</span>{{ object.office_location|default:"-" }}</div>
+        </div>
+    </div>
+</section>
+
+<section class="grid-2" style="margin-top:16px;">
+    <div class="panel">
+        <div class="panel-header"><h2>Weekly Schedule</h2></div>
+        <div class="panel-body">
+            {% if current_schedule %}
+                <div class="definition-grid">
+                    <div class="definition"><span>Shift</span>{{ current_schedule.shift.name }}</div>
+                    <div class="definition"><span>Effective</span>{{ current_schedule.effective_start }} - {{ current_schedule.effective_end|default:"Open" }}</div>
+                    <div class="definition"><span>Flexible</span>{{ current_schedule.is_flexible|yesno:"Yes,No" }}</div>
+                </div>
+                <p class="muted" style="margin-top:14px;">{% if current_schedule.monday %}Monday {% endif %}{% if current_schedule.tuesday %}Tuesday {% endif %}{% if current_schedule.wednesday %}Wednesday {% endif %}{% if current_schedule.thursday %}Thursday {% endif %}{% if current_schedule.friday %}Friday {% endif %}{% if current_schedule.saturday %}Saturday {% endif %}{% if current_schedule.sunday %}Sunday{% endif %}</p>
+            {% else %}
+                <p class="muted">No active schedule assigned.</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="panel">
+        <div class="panel-header"><h2>Leave Balance</h2></div>
+        <div class="panel-body">
+            {% for balance in leave_balances %}
+                <p style="display:flex;justify-content:space-between;margin-bottom:12px;"><span>{{ balance.get_leave_type_display }} {{ balance.year }}</span><strong>{{ balance.remaining_days }} days</strong></p>
+            {% empty %}
+                <p class="muted">No leave balance records.</p>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="panel" style="margin-top:16px;">
+    <div class="panel-header"><h2>Attendance History</h2></div>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Status</th><th>In</th><th>Out</th><th>Late</th><th>Overtime</th></tr></thead><tbody>
+    {% for record in attendance_records %}
+        <tr><td>{{ record.date }}</td><td><span class="badge">{{ record.get_status_display }}</span></td><td>{{ record.first_check_in|date:"H:i"|default:"-" }}</td><td>{{ record.last_check_out|date:"H:i"|default:"-" }}</td><td>{{ record.minutes_late }}m</td><td>{{ record.overtime_minutes }}m</td></tr>
+    {% empty %}<tr><td colspan="6" class="empty">No attendance history yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+</section>
+{% endblock %}

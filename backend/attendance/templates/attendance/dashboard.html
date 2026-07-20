@@ -1,0 +1,57 @@
+{% extends "attendance/base.html" %}
+
+{% block content %}
+<section class="metrics">
+    <article class="metric-card"><div class="metric-label">Active Employees</div><div class="metric-value">{{ employee_count }}</div><div class="metric-note">{{ department_count }} departments</div></article>
+    <article class="metric-card"><div class="metric-label">Present Today</div><div class="metric-value">{{ present_count }}</div><div class="metric-note">{{ today }}</div></article>
+    <article class="metric-card"><div class="metric-label">Late Today</div><div class="metric-value">{{ late_count }}</div><div class="metric-note">After grace period</div></article>
+    <article class="metric-card"><div class="metric-label">Absent Today</div><div class="metric-value">{{ absent_count }}</div><div class="metric-note">{{ weekly_overtime }} overtime minutes this week</div></article>
+</section>
+
+<section class="grid-2">
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Live Biometric Activity</h2>
+            <a class="button subtle" href="{% url 'attendance_records' %}">View all</a>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Employee</th><th>Department</th><th>Scan</th><th>Time</th></tr></thead>
+                <tbody>
+                {% for log in recent_logs %}
+                    <tr>
+                        <td>
+                            <div class="person-cell"><span class="avatar">{{ log.employee.first_name|slice:":1" }}{{ log.employee.last_name|slice:":1" }}</span><div><strong>{{ log.employee.full_name }}</strong><div class="muted small">{{ log.employee.organization_id }}</div></div></div>
+                        </td>
+                        <td>{{ log.employee.department|default:"Unassigned" }}</td>
+                        <td><span class="badge {% if log.scan_type == 'IN' %}success{% else %}warning{% endif %}">{{ log.get_scan_type_display }}</span></td>
+                        <td>{{ log.timestamp|date:"M d, H:i" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="4" class="empty">No biometric scans yet.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <aside class="panel">
+        <div class="panel-header"><h2>Today by Status</h2></div>
+        <div class="panel-body">
+            {% for row in status_breakdown %}
+                <p style="display:flex;justify-content:space-between;margin-bottom:12px;"><span>{{ row.status }}</span><strong>{{ row.total }}</strong></p>
+            {% empty %}
+                <p class="muted">Attendance will appear as employees check in or when records are calculated.</p>
+            {% endfor %}
+        </div>
+        <div class="panel-header"><h2>Departments</h2></div>
+        <div class="panel-body">
+            {% for dept in department_stats %}
+                <p style="display:flex;justify-content:space-between;margin-bottom:12px;"><span>{{ dept.name }}</span><strong>{{ dept.employee_total }}</strong></p>
+            {% empty %}
+                <p class="muted">No departments created.</p>
+            {% endfor %}
+        </div>
+    </aside>
+</section>
+{% endblock %}

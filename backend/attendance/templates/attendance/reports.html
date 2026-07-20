@@ -1,0 +1,35 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<section class="metrics">
+    {% for row in monthly_status %}
+        <article class="metric-card"><div class="metric-label">{{ row.status }}</div><div class="metric-value">{{ row.total }}</div><div class="metric-note">This month</div></article>
+    {% empty %}
+        <article class="metric-card"><div class="metric-label">Monthly Records</div><div class="metric-value">0</div><div class="metric-note">No calculated records yet</div></article>
+    {% endfor %}
+</section>
+
+<section class="grid-2">
+    <div class="panel">
+        <div class="panel-header"><h2>Department Attendance</h2><div class="table-actions"><a class="button" href="{% url 'attendance_records' %}?export=csv">CSV</a><a class="button" href="{% url 'attendance_records' %}?export=excel">Excel</a><a class="button" href="{% url 'attendance_records' %}?export=pdf">PDF</a></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Department</th><th>Total</th><th>Late</th><th>Absent</th><th>Overtime</th></tr></thead><tbody>
+        {% for row in department_attendance %}
+            <tr><td>{{ row.employee__department__name|default:"Unassigned" }}</td><td>{{ row.total }}</td><td>{{ row.late }}</td><td>{{ row.absent }}</td><td>{{ row.overtime|default:0 }}m</td></tr>
+        {% empty %}<tr><td colspan="5" class="empty">No department attendance this month.</td></tr>{% endfor %}
+        </tbody></table></div>
+    </div>
+    <div class="panel">
+        <div class="panel-header"><h2>Report Catalog</h2></div>
+        <div class="panel-body">
+            <p class="definition"><span>Daily</span><a href="{% url 'attendance_records' %}?date_from={{ today }}&date_to={{ today }}">Daily attendance</a></p>
+            <p class="definition"><span>Weekly</span><a href="{% url 'attendance_records' %}">Weekly attendance</a></p>
+            <p class="definition"><span>Monthly</span><a href="{% url 'attendance_records' %}">Monthly attendance</a></p>
+            <p class="definition"><span>Exceptions</span>Late arrivals, absences, overtime, unexpected attendance</p>
+        </div>
+    </div>
+</section>
+
+<section class="grid-2" style="margin-top:16px;">
+    <div class="panel"><div class="panel-header"><h2>Late Arrivals</h2></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Minutes</th></tr></thead><tbody>{% for record in late_arrivals %}<tr><td>{{ record.date }}</td><td>{{ record.employee.full_name }}</td><td>{{ record.minutes_late }}</td></tr>{% empty %}<tr><td colspan="3" class="empty">No late arrivals.</td></tr>{% endfor %}</tbody></table></div></div>
+    <div class="panel"><div class="panel-header"><h2>Absences</h2></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Department</th></tr></thead><tbody>{% for record in absences %}<tr><td>{{ record.date }}</td><td>{{ record.employee.full_name }}</td><td>{{ record.employee.department|default:"-" }}</td></tr>{% empty %}<tr><td colspan="3" class="empty">No absences.</td></tr>{% endfor %}</tbody></table></div></div>
+</section>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<section class="metrics">
+    <article class="metric-card"><div class="metric-label">Debug</div><div class="metric-value">{{ system_health.debug|yesno:"On,Off" }}</div><div class="metric-note">Runtime mode</div></article>
+    <article class="metric-card"><div class="metric-label">Timezone</div><div class="metric-value" style="font-size:1.35rem;">{{ system_health.timezone }}</div><div class="metric-note">Attendance calculations</div></article>
+    <article class="metric-card"><div class="metric-label">Database</div><div class="metric-value" style="font-size:1.35rem;">{{ system_health.database }}</div><div class="metric-note">Configured backend</div></article>
+</section>
+<div class="panel">
+    <div class="panel-header"><h2>Settings Registry</h2></div>
+    <div class="table-wrap"><table><thead><tr><th>Key</th><th>Value</th><th>Description</th><th>Updated</th></tr></thead><tbody>
+    {% for setting in settings_rows %}
+        <tr><td><strong>{{ setting.key }}</strong></td><td>{{ setting.value|truncatechars:80 }}</td><td>{{ setting.description }}</td><td>{{ setting.updated_at|date:"M d, Y H:i" }}</td></tr>
+    {% empty %}<tr><td colspan="4" class="empty">No system settings have been created.</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+{% endblock %}

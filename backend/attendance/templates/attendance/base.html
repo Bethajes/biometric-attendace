@@ -1,0 +1,56 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title|default:"Dashboard" }} | SmartHR Attendance</title>
+    <link rel="stylesheet" href="{% static 'attendance/css/app.css' %}">
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <a class="brand" href="{% url 'dashboard' %}">
+                <span class="brand-mark">SA</span>
+                <span>
+                    <strong>SmartAttend</strong>
+                    <small>Enterprise HR</small>
+                </span>
+            </a>
+            <nav class="nav">
+                {% for key,label,route in nav_items %}
+                    {% url route as nav_url %}
+                    <a class="nav-link {% if active_nav == key %}active{% endif %}" href="{{ nav_url }}">
+                        <span class="nav-icon">{{ label|slice:":1" }}</span>
+                        <span>{{ label }}</span>
+                    </a>
+                {% endfor %}
+            </nav>
+        </aside>
+
+        <main class="main">
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">Attendance Operations</p>
+                    <h1>{{ page_title|default:"Dashboard" }}</h1>
+                </div>
+                <div class="top-actions">
+                    <a class="icon-button" title="Export CSV" href="?{{ request.GET.urlencode }}{% if request.GET.urlencode %}&{% endif %}export=csv">CSV</a>
+                    <a class="icon-button" title="Open Django admin" href="/admin/">Admin</a>
+                </div>
+            </header>
+
+            {% if messages %}
+                <div class="messages">
+                    {% for message in messages %}
+                        <div class="message {{ message.tags }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    <script src="{% static 'attendance/js/app.js' %}"></script>
+</body>
+</html>

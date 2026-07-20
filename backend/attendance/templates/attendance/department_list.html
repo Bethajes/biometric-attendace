@@ -1,0 +1,12 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header"><h2>Departments</h2><a class="button primary" href="{% url 'department_add' %}">Add Department</a></div>
+    <div class="panel-body"><form class="filter-bar" method="get"><label>Search<input name="q" value="{{ request.GET.q }}" placeholder="Department or code"></label><button class="button primary">Apply</button><a class="button subtle" href="{% url 'department_list' %}">Reset</a></form></div>
+    <div class="table-wrap"><table><thead><tr><th>Name</th><th>Code</th><th>Manager</th><th>Employees</th><th>Status</th><th></th></tr></thead><tbody>
+    {% for department in object_list %}
+        <tr><td><strong>{{ department.name }}</strong></td><td>{{ department.code|default:"-" }}</td><td>{{ department.manager|default:"-" }}</td><td>{{ department.employee_count }}</td><td><span class="badge {% if department.is_active %}success{% else %}warning{% endif %}">{% if department.is_active %}Active{% else %}Inactive{% endif %}</span></td><td><a class="button subtle" href="{% url 'department_edit' department.pk %}">Edit</a></td></tr>
+    {% empty %}<tr><td colspan="6" class="empty">No departments found.</td></tr>{% endfor %}
+    </tbody></table></div>{% include "attendance/_pagination.html" %}
+</div>
+{% endblock %}

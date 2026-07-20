@@ -1,0 +1,12 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header"><h2>Leave Requests</h2><a class="button primary" href="{% url 'leave_add' %}">Add Leave</a></div>
+    <div class="panel-body"><form class="filter-bar" method="get"><label>Search<input name="q" value="{{ request.GET.q }}" placeholder="Employee or reason"></label><label>Status<select name="status"><option value="">All</option><option value="PENDING">Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option><option value="CANCELLED">Cancelled</option></select></label><button class="button primary">Apply</button><a class="button subtle" href="{% url 'leave_list' %}">Reset</a><div class="table-actions"><a class="button" href="?export=csv">CSV</a><a class="button" href="?export=excel">Excel</a></div></form></div>
+    <div class="table-wrap"><table><thead><tr><th>Employee</th><th>Type</th><th>Dates</th><th>Days</th><th>Status</th><th>Reason</th><th></th></tr></thead><tbody>
+    {% for leave in object_list %}
+        <tr><td><strong>{{ leave.employee.full_name }}</strong></td><td>{{ leave.get_leave_type_display }}</td><td>{{ leave.start_date }} - {{ leave.end_date }}</td><td>{{ leave.days }}</td><td><span class="badge {% if leave.status == 'APPROVED' %}success{% elif leave.status == 'REJECTED' %}danger{% else %}warning{% endif %}">{{ leave.get_status_display }}</span></td><td>{{ leave.reason|truncatechars:42 }}</td><td><a class="button subtle" href="{% url 'leave_edit' leave.pk %}">Edit</a></td></tr>
+    {% empty %}<tr><td colspan="7" class="empty">No leave requests found.</td></tr>{% endfor %}
+    </tbody></table></div>{% include "attendance/_pagination.html" %}
+</div>
+{% endblock %}
