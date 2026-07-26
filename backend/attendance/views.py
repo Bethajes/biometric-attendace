@@ -58,6 +58,7 @@ class EnterpriseContextMixin:
             ('schedules', 'Schedules', 'schedule_list'),
             ('shifts', 'Shifts', 'shift_list'),
             ('attendance', 'Attendance', 'attendance_records'),
+            ('devices', 'Devices', 'device_dashboard'),
             ('leave', 'Leave', 'leave_list'),
             ('holidays', 'Holidays', 'holiday_list'),
             ('reports', 'Reports', 'reports'),
@@ -631,3 +632,23 @@ def enrollment_fail_api(request, request_id):
     enrollment_request.error_message = payload.get('message', 'Enrollment failed')
     enrollment_request.save(update_fields=['status', 'error_message'])
     return JsonResponse({'status': 'ok', 'message': enrollment_request.error_message})
+
+
+# ---------------------------------------------------------------------------
+# Enrollment scanning page (real-time WebSocket UI)
+# ---------------------------------------------------------------------------
+
+def enroll_scan_view(request, enrollment_id):
+    """Rendering the real-time fingerprint scanning page."""
+    enrollment = get_object_or_404(
+        EnrollmentRequest.objects.select_related('employee', 'device'),
+        pk=enrollment_id,
+    )
+
+    return render(request, 'admin/attendance/employee/enroll_scan.html', {
+        'enrollment': enrollment,
+        'employee': enrollment.employee,
+        'device': enrollment.device,
+        'fingerprint_id': enrollment.fingerprint_id,
+        'page_title': f'Enrolling — {enrollment.employee.full_name}',
+    })

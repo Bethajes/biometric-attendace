@@ -19,6 +19,10 @@ class Department(models.Model):
     )
     is_active = models.BooleanField(default=True)
     
+    class Meta:
+        verbose_name = 'Department'
+        verbose_name_plural = 'Departments'
+
     def __str__(self):
         return self.name
 
@@ -31,6 +35,8 @@ class OfficeLocation(models.Model):
 
     class Meta:
         ordering = ['name']
+        verbose_name = 'Office Location'
+        verbose_name_plural = 'Office Locations'
 
     def __str__(self):
         return self.name
@@ -68,6 +74,8 @@ class Employee(models.Model):
             models.Index(fields=['department', 'employment_status']),
         ]
         ordering = ['first_name', 'last_name']
+        verbose_name = 'Employee'
+        verbose_name_plural = 'Employees'
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.organization_id})"
@@ -99,6 +107,8 @@ class Shift(models.Model):
 
     class Meta:
         ordering = ['start_time', 'name']
+        verbose_name = 'Shift'
+        verbose_name_plural = 'Shifts'
 
     def __str__(self):
         return self.name
@@ -140,6 +150,8 @@ class EmployeeSchedule(models.Model):
             models.Index(fields=['employee', 'effective_start', 'effective_end']),
             models.Index(fields=['department', 'effective_start']),
         ]
+        verbose_name = 'Employee Schedule'
+        verbose_name_plural = 'Employee Schedules'
 
     def __str__(self):
         return f'{self.employee.full_name} - {self.shift.name}'
@@ -164,6 +176,8 @@ class Holiday(models.Model):
     class Meta:
         ordering = ['date', 'name']
         unique_together = [('name', 'date', 'department', 'office_location')]
+        verbose_name = 'Holiday'
+        verbose_name_plural = 'Holidays'
 
     def __str__(self):
         return f'{self.name} ({self.date})'
@@ -205,6 +219,8 @@ class LeaveRequest(models.Model):
             models.Index(fields=['employee', 'start_date', 'end_date']),
             models.Index(fields=['status', 'start_date']),
         ]
+        verbose_name = 'Leave Request'
+        verbose_name_plural = 'Leave Requests'
 
     def __str__(self):
         return f'{self.employee.full_name} {self.leave_type} ({self.start_date} - {self.end_date})'
@@ -224,6 +240,8 @@ class LeaveBalance(models.Model):
     class Meta:
         unique_together = [('employee', 'leave_type', 'year')]
         ordering = ['-year', 'leave_type']
+        verbose_name = 'Leave Balance'
+        verbose_name_plural = 'Leave Balances'
 
     @property
     def remaining_days(self):
@@ -239,6 +257,10 @@ class AttendanceLog(models.Model):
         ('OUT', 'Check-Out'),
     ]
     scan_type = models.CharField(max_length=10, choices=SCAN_TYPES, default='IN')
+
+    class Meta:
+        verbose_name = 'Attendance Log'
+        verbose_name_plural = 'Attendance Logs'
 
     def __str__(self):
         return f"{self.employee.first_name} - {self.scan_type} at {self.timestamp.strftime('%H:%M')}"
@@ -277,6 +299,8 @@ class AttendanceRecord(models.Model):
             models.Index(fields=['date', 'status']),
             models.Index(fields=['employee', 'date']),
         ]
+        verbose_name = 'Attendance Record'
+        verbose_name_plural = 'Attendance Records'
 
     def __str__(self):
         return f'{self.employee.full_name} - {self.date} - {self.get_status_display()}'
@@ -300,6 +324,11 @@ class EnrollmentRequest(models.Model):
     dispatched_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     error_message = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-requested_at']
+        verbose_name = 'Enrollment Request'
+        verbose_name_plural = 'Enrollment Requests'
 
     def __str__(self):
         return f"Enrollment {self.fingerprint_id} for {self.employee.organization_id} ({self.status})"
@@ -335,6 +364,8 @@ class BiometricDevice(models.Model):
 
     class Meta:
         ordering = ['name']
+        verbose_name = 'Biometric Device'
+        verbose_name_plural = 'Biometric Devices'
 
     def __str__(self):
         return f'{self.name} ({self.device_id})'
@@ -377,6 +408,8 @@ class DeviceCommand(models.Model):
             models.Index(fields=['device', 'status', 'created_at']),
             models.Index(fields=['employee', 'created_at']),
         ]
+        verbose_name = 'Device Command'
+        verbose_name_plural = 'Device Commands'
 
     def __str__(self):
         return f'{self.command} for {self.device.device_id} ({self.status})'
@@ -411,6 +444,8 @@ class DeviceEvent(models.Model):
             models.Index(fields=['device', 'created_at']),
             models.Index(fields=['event_type', 'created_at']),
         ]
+        verbose_name = 'Device Event'
+        verbose_name_plural = 'Device Events'
 
     def __str__(self):
         return f'{self.device.device_id} {self.event_type} {self.created_at:%Y-%m-%d %H:%M:%S}'
@@ -431,6 +466,8 @@ class Notification(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        verbose_name = 'Notification'
+        verbose_name_plural = 'Notifications'
 
     def __str__(self):
         return self.title
@@ -444,6 +481,8 @@ class SystemSetting(models.Model):
 
     class Meta:
         ordering = ['key']
+        verbose_name = 'System Setting'
+        verbose_name_plural = 'System Settings'
 
     def __str__(self):
         return self.key

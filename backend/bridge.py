@@ -1,254 +1,232 @@
-import serial
-import time
+"""
+FingerprintBridge — Standalone bridge process that connects Arduino hardware
+to the Django backend over serial + HTTP.
+
+In production, this runs as a separate process beside the Arduino. It:
+  1. Maintains the serial link to the Arduino.
+  2. Reads incoming messages and pushes them to Django via the
+     device_manager API endpoint.
+  3. Polls Django for pending enrollment requests and dispatches them.
+  4. Forwards attendance MATCH events to the attendance API.
+
+Usage:
+    python bridge.py                          # defaults
+    python bridge.py --port /dev/ttyUSB1      # custom port
+    python bridge.py --device-id 1            # target specific Django device
+    python bridge.py --api-url http://host/   # custom Django URL
+"""
+
+import argparse
+import json
 import threading
-import requests
+import time
 from datetime import datetime
 
+import requests
+import serial
+
+
 class FingerprintBridge:
-    def __init__(self, port='/dev/ttyUSB0', baudrate=9600, api_url='http://127.0.0.1:8000/'):
+    def __init__(self, port='/dev/ttyUSB0', baudrate=9600,
+                 api_url='http://127.0.0.1:8000/', device_pk=None):
         self.port = port
         self.baudrate = baudrate
-        self.api_url = api_url
-        self.serial = None
+        self.api_url = api_url.rstrip('/')
+        self.device_pk = device_pk
+        self.serial_conn = None
         self.running = True
         self.serial_lock = threading.Lock()
         self.active_enrollment = None
         self.poll_interval = 2
-        
+
+    # ------------------------------------------------------------------
+    # Serial connection
+    # ------------------------------------------------------------------
+
     def connect(self):
-        """Establish serial connection to Arduino"""
         try:
-            self.serial = serial.Serial(self.port, self.baudrate, timeout=1)
-            time.sleep(2)  # Wait for Arduino to reset
+            self.serial_conn = serial.Serial(self.port, self.baudrate, timeout=1)
+            time.sleep(2)
             print(f"Connected to {self.port}")
             return True
         except Exception as e:
             print(f"Failed to connect: {e}")
             return False
-            
+
     def send_command(self, command):
-        """Send a command to the Arduino"""
-        if not self.serial:
+        if not self.serial_conn:
             print("Not connected")
             return False
-            
         try:
             with self.serial_lock:
-                self.serial.write((command + '\n').encode())
+                self.serial_conn.write((command + '\n').encode())
             print(f"Sent: {command}")
             return True
         except Exception as e:
             print(f"Error sending command: {e}")
             return False
-            
-    def read_response(self):
-        """Read and parse Arduino responses"""
+
+    def read_line(self):
         try:
-            if self.serial.in_waiting > 0:
-                line = self.serial.readline().decode().strip()
+            if self.serial_conn.in_waiting > 0:
+                line = self.serial_conn.readline().decode('utf-8', errors='replace').strip()
                 if line:
                     print(f"Received: {line}")
-                    return self.parse_response(line)
+                    return line
         except Exception as e:
-            print(f"Error reading: {e}")
+            print(f"Read error: {e}")
         return None
-        
-    def parse_response(self, message):
-        """Parse different types of messages from Arduino"""
-        if message.startswith('MATCH:') or message.startswith('ATTENDANCE:MATCH:'):
-            parts = message.split(':')
-            if len(parts) >= 2:
-                user_index = 1 if message.startswith('MATCH:') else 2
-                confidence_index = 2 if message.startswith('MATCH:') else 3
-                return {
-                    'type': 'attendance_match',
-                    'user_id': int(parts[user_index]),
-                    'confidence': int(parts[confidence_index]) if len(parts) > confidence_index else 0,
-                    'timestamp': datetime.now().isoformat()
-                }
-                
-        elif message.startswith('ATTENDANCE:NO_MATCH'):
-            return {'type': 'attendance_no_match'}
-            
-        elif message.startswith('SUCCESS_ENROLL:'):
-            user_id = int(message.split(':')[1])
-            return {
-                'type': 'enroll_success',
-                'user_id': user_id
-            }
-            
-        elif message.startswith('ERROR:'):
-            return {
-                'type': 'error',
-                'message': message
-            }
-            
-        elif message.startswith('ACK:'):
-            return {
-                'type': 'acknowledgement',
-                'message': message
-            }
-            
-        elif message.startswith('INFO:'):
-            return {
-                'type': 'info',
-                'message': message
-            }
-            
-        return {'type': 'unknown', 'message': message}
-        
-    def process_response(self, parsed):
-        """Handle different types of responses"""
-        if parsed['type'] == 'attendance_match':
-            self.send_attendance_to_django(parsed['user_id'])
-            
-        elif parsed['type'] == 'enroll_success':
-            print(f"✅ Employee {parsed['user_id']} enrolled successfully!")
-            if self.active_enrollment and self.active_enrollment.get('fingerprint_id') == parsed['user_id']:
-                self.complete_enrollment()
-            
-        elif parsed['type'] == 'error':
-            print(f"❌ Error: {parsed['message']}")
-            if self.active_enrollment:
-                self.fail_enrollment(parsed['message'])
 
-    def send_attendance_to_django(self, fingerprint_id):
+    # ------------------------------------------------------------------
+    # Django API helpers
+    # ------------------------------------------------------------------
+
+    def _post(self, path, data=None):
         try:
-            response = requests.post(f"{self.api_url}attendance/", json={'fingerprint_id': fingerprint_id}, timeout=5)
-            if response.status_code in (200, 201):
-                print(f"✅ Attendance synced for fingerprint {fingerprint_id}")
-            else:
-                print(f"⚠️ Attendance sync failed: {response.status_code} {response.text}")
+            url = f"{self.api_url}{path}"
+            r = requests.post(url, json=data or {}, timeout=5)
+            return r.status_code, r.json() if r.headers.get('content-type', '').startswith('application/json') else {}
         except Exception as e:
-            print(f"⚠️ Django attendance error: {e}")
-            
-    def send_to_django(self, endpoint, data):
-        """Send data to Django API"""
+            print(f"POST {path} error: {e}")
+            return 0, {}
+
+    def _get(self, path):
         try:
-            url = f"{self.api_url}{endpoint}/"
-            response = requests.post(url, json=data, timeout=5)
-            if response.status_code == 200:
-                print(f"✅ Synced to Django: {endpoint}")
-            else:
-                print(f"⚠️ Django sync failed: {response.status_code}")
+            url = f"{self.api_url}{path}"
+            r = requests.get(url, timeout=5)
+            return r.status_code, r.json() if r.headers.get('content-type', '').startswith('application/json') else {}
         except Exception as e:
-            print(f"⚠️ Django connection error: {e}")
-            
-    def enroll_employee(self, employee_id):
-        """Public method to enroll an employee"""
-        if employee_id < 1 or employee_id > 126:
-            print("❌ Employee ID must be between 1 and 126")
-            return False
-            
-        print(f"📝 Starting enrollment for ID {employee_id}...")
-        print("📌 Please follow the fingerprint scanner prompts")
-        return self.send_command(f"ENROLL:{employee_id}")
+            print(f"GET {path} error: {e}")
+            return 0, {}
+
+    def push_message(self, raw_message):
+        """Push an Arduino message to Django for processing."""
+        if not self.device_pk:
+            return
+        self._post(f'devices/api/devices/{self.device_pk}/message/', {'message': raw_message})
+
+    def send_attendance(self, fingerprint_id):
+        """Forward attendance event to Django."""
+        status, body = self._post('attendance/', {'fingerprint_id': fingerprint_id})
+        if status in (200, 201):
+            print(f"  Attendance synced for fp_id={fingerprint_id}: {body.get('message', '')}")
+        else:
+            print(f"  Attendance sync failed: {status}")
+
+    # ------------------------------------------------------------------
+    # Enrollment queue polling
+    # ------------------------------------------------------------------
 
     def poll_enrollment_queue(self):
-        try:
-            response = requests.get(f"{self.api_url}enrollment/next/", timeout=5)
-            if response.status_code != 200:
-                return
+        if self.active_enrollment is not None:
+            return
 
-            payload = response.json()
-            if payload.get('status') != 'ok':
-                return
+        status, payload = self._get('api/enrollment/next/')
+        if status != 200 or payload.get('status') != 'ok':
+            return
 
-            request_data = payload.get('request', {})
-            fingerprint_id = request_data.get('fingerprint_id')
-            if not fingerprint_id:
-                return
+        request_data = payload.get('request', {})
+        fingerprint_id = request_data.get('fingerprint_id')
+        if not fingerprint_id:
+            return
 
-            self.active_enrollment = request_data
-            self.send_command(f"ENROLL:{fingerprint_id}")
-            print(f"🧭 Dispatched enrollment request #{request_data.get('id')} for {request_data.get('organization_id')}")
-        except Exception as e:
-            print(f"⚠️ Enrollment poll error: {e}")
+        self.active_enrollment = request_data
+        self.send_command(f"ENROLL:{fingerprint_id}")
+        print(f"  Dispatched enrollment #{request_data.get('id')} for "
+              f"{request_data.get('organization_id')} (fp_id={fingerprint_id})")
 
     def complete_enrollment(self):
-        try:
-            request_id = self.active_enrollment.get('id')
-            response = requests.post(f"{self.api_url}enrollment/{request_id}/complete/", timeout=5)
-            if response.status_code in (200, 201):
-                print(f"✅ Enrollment request {request_id} completed")
-            else:
-                print(f"⚠️ Enrollment completion failed: {response.status_code} {response.text}")
-        except Exception as e:
-            print(f"⚠️ Enrollment completion error: {e}")
-        finally:
-            self.active_enrollment = None
+        if not self.active_enrollment:
+            return
+        request_id = self.active_enrollment.get('id')
+        status, _ = self._post(f'api/enrollment/{request_id}/complete/')
+        print(f"  Enrollment {request_id} completed: {status}")
+        self.active_enrollment = None
 
     def fail_enrollment(self, message):
-        try:
-            request_id = self.active_enrollment.get('id')
-            response = requests.post(
-                f"{self.api_url}enrollment/{request_id}/fail/",
-                json={'message': message},
-                timeout=5,
-            )
-            if response.status_code in (200, 201):
-                print(f"⚠️ Enrollment request {request_id} marked failed")
-            else:
-                print(f"⚠️ Enrollment failure sync failed: {response.status_code} {response.text}")
-        except Exception as e:
-            print(f"⚠️ Enrollment failure error: {e}")
-        finally:
-            self.active_enrollment = None
-        
-    def switch_to_attendance(self):
-        """Switch back to attendance mode"""
-        return self.send_command("ATTENDANCE")
-        
-    def delete_fingerprint(self, employee_id):
-        """Delete a fingerprint template"""
-        return self.send_command(f"DELETE:{employee_id}")
-        
-    def delete_all(self):
-        """Delete all fingerprints"""
-        return self.send_command("DELETE_ALL")
-        
-    def get_template_count(self):
-        """Get number of stored templates"""
-        return self.send_command("GET_COUNT")
-        
+        if not self.active_enrollment:
+            return
+        request_id = self.active_enrollment.get('id')
+        status, _ = self._post(f'api/enrollment/{request_id}/fail/', {'message': message})
+        print(f"  Enrollment {request_id} failed: {status}")
+        self.active_enrollment = None
+
+    # ------------------------------------------------------------------
+    # Message processing
+    # ------------------------------------------------------------------
+
+    def process_message(self, raw):
+        """Parse an Arduino message, forward to Django, and handle locally."""
+        # Push raw message to Django for canonical event logging
+        self.push_message(raw)
+
+        parts = raw.split(':')
+        kind = parts[0]
+
+        if kind == 'MATCH' or (kind == 'ATTENDANCE' and len(parts) > 1 and parts[1] == 'MATCH'):
+            fp_id = int(parts[2] if kind == 'ATTENDANCE' else parts[1])
+            self.send_attendance(fp_id)
+
+        elif kind == 'SUCCESS_ENROLL':
+            fp_id = int(parts[1]) if len(parts) > 1 else None
+            if self.active_enrollment and self.active_enrollment.get('fingerprint_id') == fp_id:
+                self.complete_enrollment()
+
+        elif kind == 'ERROR':
+            msg = parts[1] if len(parts) > 1 else raw
+            if self.active_enrollment:
+                self.fail_enrollment(msg)
+
+    # ------------------------------------------------------------------
+    # Main loop
+    # ------------------------------------------------------------------
+
     def listen_loop(self):
-        """Main listening loop"""
-        print("🔍 Listening for fingerprint events...")
+        print("Listening for fingerprint events...")
         print("Bridge is polling Django for enrollment requests.")
 
         def poller():
             while self.running:
-                if self.active_enrollment is None:
-                    self.poll_enrollment_queue()
+                self.poll_enrollment_queue()
                 time.sleep(self.poll_interval)
 
         poll_thread = threading.Thread(target=poller, daemon=True)
         poll_thread.start()
-        
-        # Main read loop
+
         while self.running:
-            response = self.read_response()
-            if response:
-                self.process_response(response)
-            time.sleep(0.1)
-            
+            line = self.read_line()
+            if line:
+                self.process_message(line)
+            time.sleep(0.05)
+
     def run(self):
-        """Main entry point"""
         if not self.connect():
             return
-            
         try:
             self.listen_loop()
         except KeyboardInterrupt:
-            print("\n👋 Shutting down...")
+            print("\nShutting down...")
         finally:
-            if self.serial:
-                self.serial.close()
+            if self.serial_conn:
+                self.serial_conn.close()
 
-if __name__ == "__main__":
-    # Configuration
-    PORT = '/dev/ttyUSB0'  # Change to your Arduino port
-    API_URL = 'http://127.0.0.1:8000/'  # Your Django API endpoint
-    
-    bridge = FingerprintBridge(port=PORT, api_url=API_URL)
+
+def main():
+    parser = argparse.ArgumentParser(description='Biometric Attendance Bridge')
+    parser.add_argument('--port', default='/dev/ttyUSB0', help='Serial port')
+    parser.add_argument('--baudrate', type=int, default=9600, help='Baud rate')
+    parser.add_argument('--api-url', default='http://127.0.0.1:8000/', help='Django API base URL')
+    parser.add_argument('--device-id', type=int, default=None, help='Django BiometricDevice PK')
+    args = parser.parse_args()
+
+    bridge = FingerprintBridge(
+        port=args.port,
+        baudrate=args.baudrate,
+        api_url=args.api_url,
+        device_pk=args.device_id,
+    )
     bridge.run()
+
+
+if __name__ == '__main__':
+    main()

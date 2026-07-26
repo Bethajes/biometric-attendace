@@ -1,0 +1,558 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }} — Biometric Attendance{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    :root {
+        --brand: #126b8f;
+        --brand-dark: #0b4f6d;
+        --accent: #1f8a70;
+        --danger: #c2413b;
+        --text: #172033;
+        --muted: #687589;
+        --surface: #ffffff;
+        --bg: #f3f6f9;
+        --line: #d9e2ec;
+    }
+
+    body { background: var(--bg); }
+
+    .scan-container {
+        max-width: 640px;
+        margin: 60px auto;
+        padding: 0 24px;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    }
+
+    .scan-card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        box-shadow: 0 20px 48px rgba(23, 32, 51, 0.1);
+        overflow: hidden;
+    }
+
+    .scan-header {
+        text-align: center;
+        padding: 32px 24px 20px;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .scan-header h1 {
+        font-size: 1.4rem;
+        margin: 0 0 4px;
+        color: var(--text);
+    }
+
+    .scan-header .subtitle {
+        color: var(--muted);
+        font-size: 0.88rem;
+    }
+
+    .scan-body { padding: 28px 24px; }
+
+    .employee-info {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 16px;
+        background: #f8fafc;
+        border-radius: 10px;
+        margin-bottom: 24px;
+    }
+
+    .employee-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        background: #e8f3f7;
+        color: var(--brand-dark);
+        display: grid;
+        place-items: center;
+        font-weight: 900;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+    }
+
+    .employee-details strong { display: block; font-size: 1.05rem; }
+    .employee-details span { color: var(--muted); font-size: 0.82rem; }
+
+    .device-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: #e8f3f7;
+        border-radius: 8px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: var(--brand-dark);
+        margin-bottom: 24px;
+    }
+
+    .device-badge .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #38a169;
+        animation: pulse-dot 2s infinite;
+    }
+
+    @keyframes pulse-dot {
+        0%, 100% { box-shadow: 0 0 3px rgba(56, 161, 105, 0.4); }
+        50% { box-shadow: 0 0 10px rgba(56, 161, 105, 0.8); }
+    }
+
+    .fp-id-display {
+        text-align: center;
+        margin-bottom: 28px;
+    }
+
+    .fp-id-display .label {
+        font-size: 0.72rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 4px;
+    }
+
+    .fp-id-display .value {
+        font-size: 2.4rem;
+        font-weight: 900;
+        color: var(--brand);
+        letter-spacing: 2px;
+    }
+
+    /* Stepper */
+    .stepper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        margin-bottom: 28px;
+    }
+
+    .stepper-step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        min-width: 100px;
+        position: relative;
+    }
+
+    .stepper-step:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        top: 16px;
+        left: calc(50% + 20px);
+        width: calc(100% - 40px);
+        height: 3px;
+        background: var(--line);
+        z-index: 0;
+    }
+
+    .stepper-step.completed:not(:last-child)::after { background: var(--accent); }
+
+    .stepper-circle {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: #f8fafc;
+        border: 2px solid var(--line);
+        color: var(--muted);
+        font-weight: 900;
+        font-size: 0.82rem;
+        z-index: 1;
+        transition: all 0.3s ease;
+    }
+
+    .stepper-step.active .stepper-circle {
+        border-color: var(--brand);
+        background: var(--brand);
+        color: #fff;
+        animation: pulse-brand 2s infinite;
+    }
+
+    .stepper-step.completed .stepper-circle {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #fff;
+    }
+
+    .stepper-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: var(--muted);
+        text-align: center;
+    }
+
+    .stepper-step.active .stepper-label,
+    .stepper-step.completed .stepper-label { color: var(--text); }
+
+    @keyframes pulse-brand {
+        0%, 100% { box-shadow: 0 0 4px rgba(18, 107, 143, 0.4); }
+        50% { box-shadow: 0 0 14px rgba(18, 107, 143, 0.8); }
+    }
+
+    /* Progress bar */
+    .progress-track {
+        background: var(--line);
+        border-radius: 6px;
+        height: 10px;
+        overflow: hidden;
+        margin-bottom: 10px;
+    }
+
+    .progress-fill {
+        height: 100%;
+        width: 0%;
+        background: var(--brand);
+        border-radius: 6px;
+        transition: width 0.5s ease, background 0.3s ease;
+    }
+
+    .progress-fill.success { background: var(--accent); }
+    .progress-fill.error { background: var(--danger); }
+
+    .progress-text {
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.84rem;
+        margin-bottom: 20px;
+    }
+
+    /* Event feed */
+    .event-feed {
+        max-height: 130px;
+        overflow-y: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 12px;
+        margin-bottom: 20px;
+    }
+
+    .event-feed:empty { display: none; }
+
+    .event-item {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 5px 0;
+        border-bottom: 1px solid #f0f4f8;
+        font-size: 0.82rem;
+    }
+
+    .event-item:last-child { border-bottom: none; }
+
+    .event-time {
+        color: var(--muted);
+        font-size: 0.74rem;
+        white-space: nowrap;
+        font-family: ui-monospace, monospace;
+    }
+
+    .event-msg { flex: 1; }
+    .event-msg.success { color: var(--accent); }
+    .event-msg.error { color: var(--danger); }
+    .event-msg.info { color: var(--brand); }
+
+    /* Result overlay */
+    .result-overlay {
+        display: none;
+        text-align: center;
+        padding: 32px 24px;
+    }
+
+    .result-icon {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        display: inline-grid;
+        place-items: center;
+        font-size: 2rem;
+        margin-bottom: 16px;
+    }
+
+    .result-icon.success { background: #e8f6ef; color: var(--accent); }
+    .result-icon.error { background: #fff0ef; color: var(--danger); }
+
+    .result-overlay h2 { font-size: 1.3rem; margin: 0 0 8px; }
+    .result-overlay p { color: var(--muted); margin: 0 0 20px; }
+
+    .scan-footer {
+        text-align: center;
+        padding: 16px 24px;
+        border-top: 1px solid var(--line);
+        background: #f8fafc;
+    }
+
+    .scan-footer a {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        color: var(--text);
+        font-weight: 700;
+        font-size: 0.84rem;
+        text-decoration: none;
+    }
+
+    .scan-footer a:hover { background: #f0f4f8; }
+
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="scan-container">
+    <div class="scan-card" id="scan-card">
+        <!-- Header -->
+        <div class="scan-header">
+            <h1>Fingerprint Enrollment</h1>
+            <div class="subtitle">Follow the instructions on the device</div>
+        </div>
+
+        <div class="scan-body" id="scan-body">
+            <!-- Employee info -->
+            <div class="employee-info">
+                <div class="employee-avatar">{{ employee.first_name|slice:":1" }}{{ employee.last_name|slice:":1" }}</div>
+                <div class="employee-details">
+                    <strong>{{ employee.full_name }}</strong>
+                    <span>{{ employee.organization_id }} · {{ employee.department|default:"No department" }}</span>
+                </div>
+            </div>
+
+            <!-- Device badge -->
+            <div class="device-badge">
+                <span class="dot"></span>
+                {{ device.name }} — {{ device.device_id }}
+            </div>
+
+            <!-- Fingerprint ID -->
+            <div class="fp-id-display">
+                <div class="label">Fingerprint ID</div>
+                <div class="value">{{ fingerprint_id }}</div>
+            </div>
+
+            <!-- Stepper -->
+            <div class="stepper">
+                <div class="stepper-step" id="step-1">
+                    <div class="stepper-circle">1</div>
+                    <div class="stepper-label">Place</div>
+                </div>
+                <div class="stepper-step" id="step-2">
+                    <div class="stepper-circle">2</div>
+                    <div class="stepper-label">Remove</div>
+                </div>
+                <div class="stepper-step" id="step-3">
+                    <div class="stepper-circle">3</div>
+                    <div class="stepper-label">Again</div>
+                </div>
+                <div class="stepper-step" id="step-4">
+                    <div class="stepper-circle">4</div>
+                    <div class="stepper-label">Done</div>
+                </div>
+            </div>
+
+            <!-- Progress bar -->
+            <div class="progress-track">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div class="progress-text" id="progress-text">Waiting for device response...</div>
+
+            <!-- Event feed -->
+            <div class="event-feed" id="event-feed"></div>
+
+            <!-- Status: waiting for WebSocket -->
+            <div id="ws-waiting" style="text-align:center;padding:12px 0;">
+                <span style="color:var(--muted);font-size:0.82rem;">Connecting to device...</span>
+            </div>
+        </div>
+
+        <!-- Result (hidden initially) -->
+        <div class="result-overlay" id="result-overlay">
+            <div class="result-icon" id="result-icon"></div>
+            <h2 id="result-title"></h2>
+            <p id="result-message"></p>
+            <a href="{% url 'admin:attendance_employee_change' employee.pk %}" class="button" style="background:var(--brand);color:#fff;border:none;padding:10px 20px;border-radius:8px;font-weight:700;cursor:pointer;text-decoration:none;">
+                Back to Employee
+            </a>
+        </div>
+
+        <!-- Footer -->
+        <div class="scan-footer" id="scan-footer">
+            <a href="{% url 'admin:attendance_employee_change' employee.pk %}">&larr; Back to Employee</a>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const ENROLLMENT_ID = {{ enrollment.pk }};
+    const EMPLOYEE_NAME = '{{ employee.full_name|escapejs }}';
+    const FP_ID = {{ fingerprint_id }};
+
+    const progressFill = document.getElementById('progress-fill');
+    const progressText = document.getElementById('progress-text');
+    const eventFeed = document.getElementById('event-feed');
+    const wsWaiting = document.getElementById('ws-waiting');
+    const resultOverlay = document.getElementById('result-overlay');
+    const scanBody = document.getElementById('scan-body');
+    const scanFooter = document.getElementById('scan-footer');
+
+    let currentStep = 0;
+    let ws = null;
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT = 10;
+
+    const STEPS = [
+        { keywords: ['place', 'finger', 'sensor', 'press', 'put'], step: 1, pct: 15 },
+        { keywords: ['remove', 'lift', 'off', 'take off'], step: 2, pct: 40 },
+        { keywords: ['again', 'once more', 'second', 'place'], step: 3, pct: 65 },
+        { keywords: ['processing', 'verifying', 'storing', 'template'], step: 4, pct: 85 },
+    ];
+
+    function connectWS() {
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${proto}//${window.location.host}/ws/enrollment/${ENROLLMENT_ID}/`);
+
+        ws.onopen = () => {
+            reconnectAttempts = 0;
+            wsWaiting.style.display = 'none';
+        };
+
+        ws.onclose = () => {
+            if (reconnectAttempts < MAX_RECONNECT) {
+                reconnectAttempts++;
+                setTimeout(connectWS, 2000 * reconnectAttempts);
+            }
+        };
+
+        ws.onerror = () => {};
+
+        ws.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            handleMessage(data);
+        };
+    }
+
+    function handleMessage(data) {
+        switch (data.type) {
+            case 'enrollment_status':
+                updateProgress(data.progress_message || data.status, data.status);
+                break;
+            case 'enrollment_progress':
+                updateProgress(data.progress_message || data.status, data.status);
+                break;
+            case 'enrollment_complete':
+                showSuccess(data.employee_name || EMPLOYEE_NAME, data.fingerprint_id || FP_ID);
+                break;
+            case 'enrollment_failed':
+                showFailed(data.error_message);
+                break;
+        }
+    }
+
+    function updateProgress(message, status) {
+        const msg = (message || '').toLowerCase();
+        progressText.textContent = message || 'Processing...';
+
+        let matchedStep = 0;
+        for (const s of STEPS) {
+            if (s.keywords.some(kw => msg.includes(kw))) {
+                matchedStep = s.step;
+                break;
+            }
+        }
+
+        if (status === 'IN_PROGRESS' && matchedStep === 0) matchedStep = 2;
+        if (status === 'DISPATCHED') matchedStep = 1;
+
+        if (matchedStep > currentStep) currentStep = matchedStep;
+
+        for (let i = 1; i <= 4; i++) {
+            const el = document.getElementById(`step-${i}`);
+            el.className = 'stepper-step';
+            if (i < currentStep) el.classList.add('completed');
+            else if (i === currentStep) el.classList.add('active');
+        }
+
+        const pct = currentStep === 1 ? 15 : currentStep === 2 ? 40 : currentStep === 3 ? 65 : currentStep === 4 ? 85 : 10;
+        progressFill.style.width = pct + '%';
+
+        addEvent('info', message);
+    }
+
+    function showSuccess(name, fpId) {
+        currentStep = 4;
+        for (let i = 1; i <= 4; i++) {
+            document.getElementById(`step-${i}`).className = 'stepper-step completed';
+        }
+        progressFill.style.width = '100%';
+        progressFill.className = 'progress-fill success';
+        progressText.textContent = 'Enrollment completed successfully!';
+
+        addEvent('success', `Fingerprint registered for ${name} (ID: ${fpId})`);
+
+        setTimeout(() => {
+            scanBody.style.display = 'none';
+            scanFooter.style.display = 'none';
+            resultOverlay.style.display = 'block';
+            document.getElementById('result-icon').textContent = '✓';
+            document.getElementById('result-icon').className = 'result-icon success';
+            document.getElementById('result-title').textContent = 'Enrollment Complete';
+            document.getElementById('result-title').style.color = 'var(--accent)';
+            document.getElementById('result-message').textContent =
+                `Fingerprint registered for ${name} (ID: ${fpId}).`;
+        }, 1200);
+    }
+
+    function showFailed(errorMsg) {
+        progressFill.style.width = '100%';
+        progressFill.className = 'progress-fill error';
+        progressText.textContent = 'Enrollment failed';
+        progressText.style.color = 'var(--danger)';
+
+        addEvent('error', errorMsg || 'Unknown error occurred.');
+
+        setTimeout(() => {
+            scanBody.style.display = 'none';
+            scanFooter.style.display = 'none';
+            resultOverlay.style.display = 'block';
+            document.getElementById('result-icon').textContent = '✗';
+            document.getElementById('result-icon').className = 'result-icon error';
+            document.getElementById('result-title').textContent = 'Enrollment Failed';
+            document.getElementById('result-title').style.color = 'var(--danger)';
+            document.getElementById('result-message').textContent = errorMsg || 'Unknown error occurred.';
+        }, 1200);
+    }
+
+    function addEvent(type, message) {
+        const time = new Date().toLocaleTimeString();
+        const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : '●';
+        const item = document.createElement('div');
+        item.className = 'event-item';
+        item.innerHTML = `<span class="event-time">${time}</span><span class="event-msg ${type}">${icon} ${message}</span>`;
+        eventFeed.insertBefore(item, eventFeed.firstChild);
+        if (eventFeed.children.length > 15) eventFeed.removeChild(eventFeed.lastChild);
+    }
+
+    connectWS();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,443 @@
+{% extends "attendance/base.html" %}
+
+{% block content %}
+<section class="metrics">
+    <article class="metric-card">
+        <div class="metric-label">Active Device</div>
+        <div class="metric-value" id="active-device-name">{{ active_device.name|default:"None" }}</div>
+        <div class="metric-note" id="active-device-status">
+            <span class="status-dot {% if active_device.status == 'ONLINE' %}online{% elif active_device.status == 'ERROR' %}error{% elif active_device.status == 'BUSY' %}busy{% else %}offline{% endif %}"></span>
+            {{ active_device.get_status_display|default:"No device connected" }}
+        </div>
+    </article>
+    <article class="metric-card">
+        <div class="metric-label">Device Mode</div>
+        <div class="metric-value" id="active-device-mode">{{ active_device.get_mode_display|default:"—" }}</div>
+        <div class="metric-note" id="active-device-templates">{{ active_device.template_count|default:0 }} templates stored</div>
+    </article>
+    <article class="metric-card">
+        <div class="metric-label">Enrollments Today</div>
+        <div class="metric-value">{{ recent_completions|length }}</div>
+        <div class="metric-note">Completed successfully</div>
+    </article>
+    <article class="metric-card">
+        <div class="metric-label">Pending</div>
+        <div class="metric-value" id="pending-count">{{ active_enrollments|length }}</div>
+        <div class="metric-note">In queue or in progress</div>
+    </article>
+</section>
+
+<section class="grid-2">
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Register Fingerprint</h2>
+            <div class="live-status">
+                <span class="ws-indicator" id="ws-status"></span>
+                <span class="muted small" id="ws-label">Connecting...</span>
+            </div>
+        </div>
+        <div class="panel-body">
+            <form id="enroll-form" onsubmit="return startEnrollment(event)">
+                <div style="margin-bottom:16px;">
+                    <label style="display:block;font-weight:600;margin-bottom:6px;">Target Device</label>
+                    <select id="device-select" style="width:100%;padding:8px;border:1px solid var(--border,#e2e8f0);border-radius:6px;">
+                        {% for d in devices %}
+                            <option value="{{ d.pk }}" data-device-name="{{ d.name }}" {% if d.pk == active_device.pk %}selected{% endif %}>
+                                {{ d.name }} ({{ d.device_id }}) — {{ d.get_status_display }}
+                            </option>
+                        {% empty %}
+                            <option value="">No devices available</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div style="margin-bottom:16px;">
+                    <label style="display:block;font-weight:600;margin-bottom:6px;">Select Employee</label>
+                    <select id="employee-select" style="width:100%;padding:8px;border:1px solid var(--border,#e2e8f0);border-radius:6px;" required>
+                        <option value="">— Choose an employee —</option>
+                        {% for emp in employees %}
+                            <option value="{{ emp.pk }}" data-emp-name="{{ emp.full_name }}" data-org-id="{{ emp.organization_id }}" data-fp-id="{{ emp.fingerprint_id|default:'auto' }}">
+                                {{ emp.full_name }} ({{ emp.organization_id }}) — fp_id={{ emp.fingerprint_id|default:"auto" }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <button class="button primary" type="submit" id="enroll-btn">Register Fingerprint</button>
+            </form>
+
+            <!-- Live Enrollment Progress -->
+            <div id="enrollment-progress" style="display:none;margin-top:24px;">
+                <div style="border:2px solid var(--brand,#126b8f);border-radius:12px;padding:24px;background:var(--surface-soft,#f8fafc);">
+                    <div style="text-align:center;margin-bottom:20px;">
+                        <h3 id="progress-title" style="margin:0 0 4px;">Enrollment in Progress</h3>
+                        <p class="muted small" id="progress-employee"></p>
+                    </div>
+
+                    <!-- Visual Stepper -->
+                    <div class="enrollment-stepper">
+                        <div class="stepper-step" id="step-1">
+                            <div class="stepper-circle">1</div>
+                            <div class="stepper-label">Place Finger</div>
+                        </div>
+                        <div class="stepper-step" id="step-2">
+                            <div class="stepper-circle">2</div>
+                            <div class="stepper-label">Remove Finger</div>
+                        </div>
+                        <div class="stepper-step" id="step-3">
+                            <div class="stepper-circle">3</div>
+                            <div class="stepper-label">Place Again</div>
+                        </div>
+                        <div class="stepper-step" id="step-4">
+                            <div class="stepper-circle">4</div>
+                            <div class="stepper-label">Complete</div>
+                        </div>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div style="margin-top:20px;">
+                        <div style="background:var(--line,#d9e2ec);border-radius:6px;height:10px;overflow:hidden;">
+                            <div id="progress-bar" style="background:var(--brand,#126b8f);height:100%;width:0%;transition:width 0.5s ease;"></div>
+                        </div>
+                        <p class="muted small" id="progress-step" style="margin-top:8px;text-align:center;">Waiting for device response...</p>
+                    </div>
+
+                    <!-- Live Event Feed -->
+                    <div id="live-feed" style="margin-top:16px;max-height:120px;overflow-y:auto;"></div>
+                </div>
+            </div>
+
+            <!-- Result Message -->
+            <div id="enroll-result" style="margin-top:16px;display:none;">
+                <div style="border-radius:8px;padding:16px;" id="result-box">
+                    <h3 id="result-title" style="margin-bottom:8px;"></h3>
+                    <p id="result-message"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <aside class="panel">
+        <div class="panel-header"><h2>Active Enrollments</h2></div>
+        <div class="panel-body" id="active-enrollments-list">
+            {% for e in active_enrollments %}
+                <div class="enrollment-item" data-enrollment-id="{{ e.id }}" style="border-bottom:1px solid var(--border,#e2e8f0);padding:12px 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <strong>{{ e.employee.full_name }}</strong>
+                            <div class="muted small">{{ e.employee.organization_id }} &middot; fp_id={{ e.fingerprint_id }}</div>
+                        </div>
+                        <span class="badge enrollment-status {% if e.status == 'IN_PROGRESS' %}success{% elif e.status == 'FAILED' %}danger{% else %}warning{% endif %}">
+                            {{ e.get_status_display }}
+                        </span>
+                    </div>
+                    <div class="enrollment-progress-text muted small" style="margin-top:4px;">{{ e.progress_message|default:"Waiting..." }}</div>
+                </div>
+            {% empty %}
+                <p class="muted">No active enrollments.</p>
+            {% endfor %}
+        </div>
+
+        <div class="panel-header"><h2>Recent Completions</h2></div>
+        <div class="panel-body">
+            {% for e in recent_completions %}
+                <div style="border-bottom:1px solid var(--border,#e2e8f0);padding:10px 0;">
+                    <div style="display:flex;justify-content:space-between;">
+                        <strong>{{ e.employee.full_name }}</strong>
+                        <span class="badge success">Completed</span>
+                    </div>
+                    <div class="muted small">fp_id={{ e.fingerprint_id }} &middot; {{ e.completed_at|date:"M d, H:i" }}</div>
+                </div>
+            {% empty %}
+                <p class="muted">No recent completions.</p>
+            {% endfor %}
+        </div>
+    </aside>
+</section>
+
+<script>
+const CSRF = '{{ csrf_token }}';
+const WS_HOST = window.location.host;
+let ws = null;
+let currentEnrollmentId = null;
+let pollTimer = null;
+
+// ---- WebSocket Connection ----
+
+function connectDeviceWS(deviceId) {
+    if (ws) { ws.close(); ws = null; }
+
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${proto}//${WS_HOST}/ws/devices/${deviceId}/`);
+
+    ws.onopen = () => {
+        document.getElementById('ws-status').className = 'ws-indicator connected';
+        document.getElementById('ws-label').textContent = 'Live';
+    };
+
+    ws.onclose = () => {
+        document.getElementById('ws-status').className = 'ws-indicator disconnected';
+        document.getElementById('ws-label').textContent = 'Disconnected';
+    };
+
+    ws.onerror = () => {
+        document.getElementById('ws-status').className = 'ws-indicator disconnected';
+        document.getElementById('ws-label').textContent = 'Error';
+    };
+
+    ws.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        handleDeviceMessage(data);
+    };
+}
+
+function connectEnrollmentWS(enrollmentId) {
+    if (!enrollmentId) return;
+
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const enrollWs = new WebSocket(`${proto}//${WS_HOST}/ws/enrollment/${enrollmentId}/`);
+
+    enrollWs.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        handleEnrollmentMessage(data);
+    };
+
+    enrollWs.onclose = () => {};
+
+    return enrollWs;
+}
+
+// ---- Message Handlers ----
+
+function handleDeviceMessage(data) {
+    if (data.type === 'device_event') {
+        addLiveFeedEntry(data.event_type, data.message);
+    }
+    if (data.type === 'device_status_update') {
+        const modeEl = document.getElementById('active-device-mode');
+        if (modeEl && data.mode) {
+            const modeNames = {ATTENDANCE:'Attendance',ENROLLMENT:'Enrollment',DELETION:'Deletion',MAINTENANCE:'Maintenance',OFFLINE:'Offline'};
+            modeEl.textContent = modeNames[data.mode] || data.mode;
+        }
+    }
+}
+
+function handleEnrollmentMessage(data) {
+    switch (data.type) {
+        case 'enrollment_status':
+        case 'enrollment_progress':
+            updateProgressStep(data.progress_message || data.status, data.status);
+            break;
+        case 'enrollment_complete':
+            showEnrollmentComplete(data.employee_name, data.fingerprint_id);
+            break;
+        case 'enrollment_failed':
+            showEnrollmentFailed(data.error_message);
+            break;
+    }
+}
+
+// ---- Progress Stepper Logic ----
+
+const STEPS = [
+    { keywords: ['place', 'finger', 'sensor', 'press', 'put'], step: 1, pct: 15 },
+    { keywords: ['remove', 'lift', 'off', 'take off'], step: 2, pct: 40 },
+    { keywords: ['again', 'once more', 'second', 'place'], step: 3, pct: 65 },
+    { keywords: ['processing', 'verifying', 'storing', 'template'], step: 4, pct: 85 },
+];
+
+let currentStep = 0;
+
+function updateProgressStep(message, status) {
+    const msg = (message || '').toLowerCase();
+    document.getElementById('progress-step').textContent = message || 'Processing...';
+
+    let matchedStep = 0;
+    for (const s of STEPS) {
+        if (s.keywords.some(kw => msg.includes(kw))) {
+            matchedStep = s.step;
+            break;
+        }
+    }
+
+    if (status === 'IN_PROGRESS' && matchedStep === 0) matchedStep = 2;
+    if (status === 'DISPATCHED') matchedStep = 1;
+
+    if (matchedStep > currentStep) {
+        currentStep = matchedStep;
+    }
+
+    // Update stepper UI
+    for (let i = 1; i <= 4; i++) {
+        const el = document.getElementById(`step-${i}`);
+        el.className = 'stepper-step';
+        if (i < currentStep) el.classList.add('completed');
+        else if (i === currentStep) el.classList.add('active');
+    }
+
+    // Update progress bar
+    const pct = currentStep === 1 ? 15 : currentStep === 2 ? 40 : currentStep === 3 ? 65 : currentStep === 4 ? 85 : 10;
+    document.getElementById('progress-bar').style.width = pct + '%';
+
+    addLiveFeedEntry('progress', message);
+}
+
+function showEnrollmentComplete(employeeName, fingerprintId) {
+    currentStep = 4;
+    for (let i = 1; i <= 4; i++) {
+        const el = document.getElementById(`step-${i}`);
+        el.className = 'stepper-step completed';
+    }
+    document.getElementById('progress-bar').style.width = '100%';
+    document.getElementById('progress-step').textContent = 'Enrollment completed successfully!';
+    document.getElementById('progress-title').textContent = 'Enrollment Complete';
+    document.getElementById('progress-title').style.color = 'var(--accent,#1f8a70)';
+
+    addLiveFeedEntry('success', `Fingerprint registered for ${employeeName} (fp_id=${fingerprintId})`);
+
+    showResult('Enrollment Complete', `Fingerprint registered for ${employeeName} (ID: ${fingerprintId}).`, 'success');
+
+    setTimeout(() => location.reload(), 3000);
+}
+
+function showEnrollmentFailed(errorMsg) {
+    document.getElementById('progress-bar').style.width = '100%';
+    document.getElementById('progress-bar').style.background = 'var(--danger,#e53e3e)';
+    document.getElementById('progress-step').textContent = 'Enrollment failed!';
+    document.getElementById('progress-title').textContent = 'Enrollment Failed';
+    document.getElementById('progress-title').style.color = 'var(--danger,#e53e3e)';
+
+    addLiveFeedEntry('error', errorMsg);
+
+    showResult('Enrollment Failed', errorMsg || 'Unknown error occurred.', 'error');
+
+    setTimeout(() => {
+        document.getElementById('enrollment-progress').style.display = 'none';
+        document.getElementById('enroll-btn').disabled = false;
+    }, 3000);
+}
+
+function addLiveFeedEntry(type, message) {
+    const feed = document.getElementById('live-feed');
+    if (!feed) return;
+    const time = new Date().toLocaleTimeString();
+    const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : '●';
+    const color = type === 'success' ? 'var(--accent)' : type === 'error' ? 'var(--danger)' : 'var(--brand)';
+    const entry = document.createElement('div');
+    entry.className = 'event-entry';
+    entry.innerHTML = `<span class="event-time">${time}</span><span class="event-message" style="color:${color};">${icon} ${message}</span>`;
+    feed.insertBefore(entry, feed.firstChild);
+    if (feed.children.length > 10) feed.removeChild(feed.lastChild);
+}
+
+function showResult(title, message, type) {
+    const box = document.getElementById('result-box');
+    const resultEl = document.getElementById('enroll-result');
+    resultEl.style.display = 'block';
+    document.getElementById('result-title').textContent = title;
+    document.getElementById('result-title').style.color = type === 'success' ? 'var(--accent,#1f8a70)' : 'var(--danger,#e53e3e)';
+    document.getElementById('result-message').textContent = message;
+    box.style.background = type === 'success' ? 'var(--success-bg,#e8f6ef)' : 'var(--danger-bg,#fff0ef)';
+    box.style.border = type === 'success' ? '1px solid #c6f6d5' : '1px solid #fed7d7';
+}
+
+// ---- Enrollment Start ----
+
+function startEnrollment(e) {
+    e.preventDefault();
+    const deviceId = document.getElementById('device-select').value;
+    const employeeSelect = document.getElementById('employee-select');
+    const employeeId = employeeSelect.value;
+    if (!deviceId || !employeeId) { alert('Select both device and employee.'); return false; }
+
+    const empOption = employeeSelect.options[employeeSelect.selectedIndex];
+    const empName = empOption.dataset.empName || 'Employee';
+
+    const btn = document.getElementById('enroll-btn');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+
+    // Reset progress UI
+    currentStep = 0;
+    document.getElementById('live-feed').innerHTML = '';
+    document.getElementById('progress-bar').style.width = '0%';
+    document.getElementById('progress-bar').style.background = 'var(--brand,#126b8f)';
+    document.getElementById('progress-title').textContent = 'Enrollment in Progress';
+    document.getElementById('progress-title').style.color = '';
+    document.getElementById('progress-employee').textContent = empName;
+    for (let i = 1; i <= 4; i++) {
+        document.getElementById(`step-${i}`).className = 'stepper-step';
+    }
+    document.getElementById('enroll-result').style.display = 'none';
+    document.getElementById('enrollment-progress').style.display = 'block';
+    document.getElementById('progress-step').textContent = 'Sending ENROLL command to device...';
+    document.getElementById('progress-bar').style.width = '5%';
+
+    addLiveFeedEntry('info', `Starting enrollment for ${empName}`);
+
+    // Connect WebSocket to device
+    connectDeviceWS(deviceId);
+
+    fetch('{% url "api_start_enrollment" %}', {
+        method: 'POST',
+        headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+        body: JSON.stringify({device_id: parseInt(deviceId), employee_id: parseInt(employeeId)})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'ok') {
+            document.getElementById('progress-step').textContent = 'Command sent. Waiting for Arduino...';
+            document.getElementById('progress-bar').style.width = '10%';
+            addLiveFeedEntry('info', 'ENROLL command dispatched to device');
+
+            currentEnrollmentId = data.enrollment_id;
+            if (currentEnrollmentId) {
+                connectEnrollmentWS(currentEnrollmentId);
+            }
+        } else {
+            showEnrollmentFailed(data.message);
+        }
+
+        btn.disabled = false;
+        btn.textContent = 'Register Fingerprint';
+    })
+    .catch(() => {
+        showEnrollmentFailed('Request failed. Check device connection.');
+        btn.disabled = false;
+        btn.textContent = 'Register Fingerprint';
+    });
+    return false;
+}
+
+// ---- Init ----
+
+document.addEventListener('DOMContentLoaded', () => {
+    const deviceSelect = document.getElementById('device-select');
+    if (deviceSelect.value) {
+        connectDeviceWS(deviceSelect.value);
+    }
+
+    deviceSelect.addEventListener('change', () => {
+        if (deviceSelect.value) connectDeviceWS(deviceSelect.value);
+    });
+
+    // Fallback: if there are active enrollments, poll
+    const hasActive = document.querySelectorAll('.enrollment-item').length > 0;
+    if (hasActive) pollEnrollments();
+});
+
+function pollEnrollments() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(() => {
+        fetch('{% url "api_enrollment_list" %}')
+            .then(r => r.json())
+            .then(data => {
+                const enrollments = data.enrollments.filter(e => ['PENDING','DISPATCHED','IN_PROGRESS'].includes(e.status));
+                document.getElementById('pending-count').textContent = enrollments.length;
+                if (enrollments.length === 0) clearInterval(pollTimer);
+            })
+            .catch(() => { clearInterval(pollTimer); });
+    }, 3000);
+}
+</script>
+{% endblock %}

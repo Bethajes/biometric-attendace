@@ -17,7 +17,7 @@
         <div class="table-wrap">
             <table>
                 <thead><tr><th>Employee</th><th>Department</th><th>Scan</th><th>Time</th></tr></thead>
-                <tbody>
+                <tbody id="live-activity-body">
                 {% for log in recent_logs %}
                     <tr>
                         <td>
@@ -28,7 +28,7 @@
                         <td>{{ log.timestamp|date:"M d, H:i" }}</td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="4" class="empty">No biometric scans yet.</td></tr>
+                    <tr id="empty-row"><td colspan="4" class="empty">No biometric scans yet.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
@@ -54,4 +54,88 @@
         </div>
     </aside>
 </section>
+
+<script>
+(function() {
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = wsProtocol + '//' + window.location.host + '/ws/dashboard-live/';
+    let socket = null;
+    let reconnectDelay = 1000;
+
+    function connect() {
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = function() {
+            console.log('[Dashboard WS] Connected');
+            reconnectDelay = 1000;
+        };
+
+        socket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            if (data.type === 'attendance_event') {
+                appendActivityRow(data);
+            }
+        };
+
+        socket.onclose = function() {
+            console.log('[Dashboard WS] Disconnected, reconnecting in ' + reconnectDelay + 'ms');
+            setTimeout(function() {
+                reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+                connect();
+            }, reconnectDelay);
+        };
+
+        socket.onerror = function() {
+            socket.close();
+        };
+    }
+
+    function appendActivityRow(data) {
+        var tbody = document.getElementById('live-activity-body');
+        if (!tbody) return;
+
+        var emptyRow = document.getElementById('empty-row');
+        if (emptyRow) emptyRow.remove();
+
+        var initials = '?';
+        if (data.employee_name) {
+            var parts = data.employee_name.split(' ');
+            initials = parts[0].charAt(0) + (parts.length > 1 ? parts[parts.length - 1].charAt(0) : '');
+        }
+
+        var scanBadgeClass = data.scan_type === 'IN' ? 'success' : 'warning';
+        var scanLabel = data.scan_type === 'IN' ? 'Check-In' : 'Check-Out';
+
+        var ts = '';
+        if (data.timestamp) {
+            var d = new Date(data.timestamp);
+            var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            ts = months[d.getMonth()] + ' ' + d.getDate() + ', ' +
+                 String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+        }
+
+        var row = document.createElement('tr');
+        row.style.background = 'var(--accent-light, #f0fff4)';
+        row.innerHTML =
+            '<td><div class="person-cell">' +
+                '<span class="avatar">' + initials + '</span>' +
+                '<div><strong>' + (data.employee_name || 'Unknown') + '</strong>' +
+                '<div class="muted small">' + (data.organization_id || '') + '</div></div>' +
+            '</div></td>' +
+            '<td>' + (data.department || 'Unassigned') + '</td>' +
+            '<td><span class="badge ' + scanBadgeClass + '">' + scanLabel + '</span></td>' +
+            '<td>' + ts + '</td>';
+
+        tbody.insertBefore(row, tbody.firstChild);
+
+        setTimeout(function() { row.style.background = ''; }, 2000);
+
+        while (tbody.children.length > 20) {
+            tbody.removeChild(tbody.lastChild);
+        }
+    }
+
+    connect();
+})();
+</script>
 {% endblock %}

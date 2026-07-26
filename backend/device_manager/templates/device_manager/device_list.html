@@ -1,0 +1,79 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>Biometric Devices</h2>
+        <div>
+            <a class="button primary" href="{% url 'enrollment_panel' %}">Enroll Fingerprint</a>
+            <a class="button subtle" href="{% url 'device_logs' %}">View Logs</a>
+        </div>
+    </div>
+    <div class="panel-body">
+        <form class="filter-bar" method="get">
+            <label>Search<input name="q" value="{{ request.GET.q }}" placeholder="Device ID, name, firmware"></label>
+            <button class="button primary" type="submit">Apply</button>
+            <a class="button subtle" href="{% url 'device_list' %}">Reset</a>
+        </form>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Device</th>
+                    <th>Port</th>
+                    <th>Mode</th>
+                    <th>Status</th>
+                    <th>Templates</th>
+                    <th>Firmware</th>
+                    <th>Last Seen</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for device in object_list %}
+                <tr>
+                    <td>
+                        <div class="person-cell">
+                            <span class="avatar">{{ device.name|slice:":2" }}</span>
+                            <div>
+                                <strong>{{ device.name }}</strong>
+                                <div class="muted small">{{ device.device_id }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>{{ device.serial_port }}</td>
+                    <td><span class="badge">{{ device.get_mode_display }}</span></td>
+                    <td>
+                        <span class="badge {% if device.status == 'ONLINE' %}success{% elif device.status == 'ERROR' %}danger{% elif device.status == 'BUSY' %}warning{% else %}muted{% endif %}">
+                            {{ device.get_status_display }}
+                        </span>
+                    </td>
+                    <td>{{ device.template_count }}</td>
+                    <td>{{ device.firmware_version|default:"—" }}</td>
+                    <td>{{ device.last_seen_at|date:"M d, H:i"|default:"Never" }}</td>
+                    <td class="row-actions">
+                        <a class="button subtle" href="{% url 'device_detail' device.pk %}">Detail</a>
+                        <button class="button subtle" onclick="connectDevice({{ device.pk }})">Connect</button>
+                        <button class="button subtle" onclick="restartDevice({{ device.pk }})">Restart</button>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="8" class="empty">No devices registered. Add a BiometricDevice in Django admin.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "attendance/_pagination.html" %}
+</div>
+<script>
+function connectDevice(id) {
+    fetch(`/devices/api/devices/${id}/connect/`, {method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}})
+        .then(r=>r.json()).then(d=>{alert(d.status);location.reload();}).catch(()=>alert('Failed'));
+}
+function restartDevice(id) {
+    if(!confirm('Restart this device?'))return;
+    fetch(`/devices/api/devices/${id}/restart/`, {method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}})
+        .then(r=>r.json()).then(d=>{alert(d.message||d.status);location.reload();}).catch(()=>alert('Failed'));
+}
+</script>
+{% endblock %}

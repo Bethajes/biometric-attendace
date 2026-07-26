@@ -23,7 +23,13 @@ demo-nodes-py==0.33.10
 diagnostic-msgs==5.3.7
 Django==6.0.4
 django-cors-headers==4.9.0
+django-jazzmin==3.0.5
 djangorestframework==3.17.1
+channels==4.3.2
+channels-redis==4.3.0
+redis==8.0.1
+daphne==4.2.2
+whitenoise==6.12.0
 domain-coordinator==0.12.0
 example-interfaces==0.12.0
 examples-rclpy-executors==0.19.7

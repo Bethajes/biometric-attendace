@@ -16,7 +16,10 @@
     </div>
     <div class="table-wrap">
         <table>
-            <thead><tr><th><a href="?sort=organization_id">ID</a></th><th><a href="?sort=first_name">Employee</a></th><th>Department</th><th>Job Title</th><th>Face</th><th>Status</th><th></th></tr></thead>
+            {% load pagination_tags %}
+{% with sort_qs=request.GET.urlencode|remove_page_param %}
+<thead><tr><th><a href="?sort=organization_id{% if sort_qs %}&{{ sort_qs }}{% endif %}">ID</a></th><th><a href="?sort=full_name{% if sort_qs %}&{{ sort_qs }}{% endif %}">Employee</a></th><th>Department</th><th>Job Title</th><th>Face</th><th>Status</th><th></th></tr></thead>
+{% endwith %}
             <tbody>
             {% for employee in object_list %}
                 <tr>

@@ -5,12 +5,10 @@
   {{ block.super }}
   {% if original and original.pk %}
     <li>
-      <form method="post" action="{% url 'admin:attendance_employee_enroll_fingerprint' original.pk %}" style="display:inline;">
-        {% csrf_token %}
-        <button type="submit" class="button" style="background:#0b57d0;color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;">
-          Enroll Fingerprint
-        </button>
-      </form>
+      <a href="{% url 'admin:attendance_employee_enroll_fingerprint' original.pk %}"
+         style="background:#0b57d0;color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;text-decoration:none;font-weight:700;">
+        Enroll Fingerprint
+      </a>
     </li>
   {% endif %}
 {% endblock %}

@@ -3,5 +3,6 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('attendance.urls')), # This connects your attendance app!
+    path('', include('attendance.urls')),
+    path('devices/', include('device_manager.urls')),
 ]

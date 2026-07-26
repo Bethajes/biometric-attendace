@@ -1,11 +1,14 @@
+{% load pagination_tags %}
 {% if is_paginated %}
+{% with base_qs=request.GET.urlencode|remove_page_param %}
 <div class="pagination">
     {% if page_obj.has_previous %}
-        <a class="button subtle" href="?page={{ page_obj.previous_page_number }}">&lt;</a>
+        <a class="button subtle" href="?page={{ page_obj.previous_page_number }}{% if base_qs %}&{{ base_qs }}{% endif %}">&lt;</a>
     {% endif %}
     <span class="button">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
     {% if page_obj.has_next %}
-        <a class="button subtle" href="?page={{ page_obj.next_page_number }}">&gt;</a>
+        <a class="button subtle" href="?page={{ page_obj.next_page_number }}{% if base_qs %}&{{ base_qs }}{% endif %}">&gt;</a>
     {% endif %}
 </div>
+{% endwith %}
 {% endif %}

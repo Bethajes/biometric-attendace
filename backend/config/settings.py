@@ -33,6 +33,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -40,15 +41,18 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Third party apps
+    'channels',
     'rest_framework',
     'corsheaders',
     # Local apps
     'attendance',
+    'device_manager',
 ]
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -75,6 +79,20 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Channels — Redis backend (required for multi-process: daphne + listen_devices)
+# Start Redis:  docker run -d --name redis -p 6379:6379 redis:7-alpine
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [('127.0.0.1', 6379)],
+        },
+    },
+}
 
 
 # Add these at the end of the file
@@ -130,3 +148,129 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# Whitenoise — serve static files without collectstatic in development
+WHITENOISE_USE_FINDERS = True
+
+
+# ---------------------------------------------------------------------------
+# Jazzmin — Django admin skin
+# ---------------------------------------------------------------------------
+
+JAZZMIN_SETTINGS = {
+    # Branding
+    'site_header': 'SmartAttend Enterprise',
+    'site_title': 'SmartAttend',
+    'site_brand': 'SmartAttend',
+    'welcome_sign': 'Welcome to SmartAttend Admin Panel',
+    'copyright': 'SmartAttend Ltd',
+
+    # Sidebar
+    'show_sidebar': True,
+    'navigation_expanded': True,
+    'hide_apps': [],
+    'hide_models': [],
+
+    # Sidebar ordering — logical grouping of all models
+    'order_with_respect_to': [
+        'auth',
+        'attendance',
+        'device_manager',
+    ],
+
+    # Icons (Font Awesome)
+    'icons': {
+        'auth': 'fas fa-users-cog',
+        'auth.Group': 'fas fa-users',
+        'auth.User': 'fas fa-user-shield',
+        'attendance.Employee': 'fas fa-user-tie',
+        'attendance.Department': 'fas fa-building',
+        'attendance.OfficeLocation': 'fas fa-map-marker-alt',
+        'attendance.Shift': 'fas fa-clock',
+        'attendance.EmployeeSchedule': 'fas fa-calendar-alt',
+        'attendance.AttendanceLog': 'fas fa-fingerprint',
+        'attendance.AttendanceRecord': 'fas fa-clipboard-list',
+        'attendance.LeaveRequest': 'fas fa-plane-departure',
+        'attendance.LeaveBalance': 'fas fa-coins',
+        'attendance.Holiday': 'fas fa-umbrella-beach',
+        'attendance.EnrollmentRequest': 'fas fa-id-card',
+        'attendance.BiometricDevice': 'fas fa-microchip',
+        'attendance.DeviceCommand': 'fas fa-terminal',
+        'attendance.DeviceEvent': 'fas fa-stream',
+        'attendance.Notification': 'fas fa-bell',
+        'attendance.SystemSetting': 'fas fa-cog',
+    },
+    'default_icon_parents': 'fas fa-folder-open',
+    'default_icon_children': 'fas fa-circle',
+
+    # Top menu links
+    'topmenu_links': [
+        {'name': 'Home', 'url': 'admin:index', 'permissions': ['auth.view_user']},
+        {'name': 'Dashboard', 'url': 'dashboard', 'new_window': True},
+        {'name': 'Device Manager', 'url': 'device_dashboard', 'new_window': True},
+        {'model': 'attendance.Employee'},
+        {'app': 'attendance'},
+    ],
+
+    # UI
+    'show_ui_builder': False,
+    'changeform_format': 'horizontal_tabs',
+    'changeform_format_overrides': {
+        'auth.User': 'vertical_tabs',
+        'attendance.Employee': 'horizontal_tabs',
+        'attendance.BiometricDevice': 'horizontal_tabs',
+        'attendance.AttendanceRecord': 'vertical_tabs',
+    },
+    'related_modal_active': True,
+
+    # Colors — match the existing brand palette
+    'brand_colour': '#126b8f',
+    'accent': '#1f8a70',
+    'brand_306b99': '#126b8f',
+    'accent_1f8a70': '#1f8a70',
+
+    # Login
+    'use_google_fonts': True,
+    'show_version': True,
+    'copyright': 'SmartAttend Ltd',
+}
+
+JAZZMIN_UI_TWEAKS = {
+    'navbar_small_text': False,
+    'footer_small_text': False,
+    'body_small_text': False,
+    'brand_small_text': False,
+    'brand_colour': False,
+    'accent': 'accent-teal',
+    'navbar': 'navbar-dark',
+    'no_navbar_border': False,
+    'navbar_fixed': True,
+    'layout_boxed': False,
+    'footer_fixed': False,
+    'sidebar_fixed': True,
+    'sidebar': 'sidebar-dark-primary',
+    'sidebar_nav_small_text': False,
+    'sidebar_disable_expand': False,
+    'sidebar_nav_child_indent': True,
+    'sidebar_nav_compact_style': False,
+    'sidebar_nav_legacy_style': False,
+    'sidebar_nav_flat_style': False,
+    'theme': 'default',
+    'button_classes': {
+        'primary': 'btn-primary',
+        'secondary': 'btn-secondary',
+        'info': 'btn-info',
+        'warning': 'btn-warning',
+        'danger': 'btn-danger',
+        'success': 'btn-success',
+    },
+}
+# settings.py
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}

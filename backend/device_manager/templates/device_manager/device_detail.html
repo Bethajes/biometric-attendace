@@ -1,0 +1,137 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<div style="margin-bottom:16px;">
+    <a class="button subtle" href="{% url 'device_list' %}">&larr; All Devices</a>
+</div>
+
+<div class="grid-2">
+    <div class="panel">
+        <div class="panel-header">
+            <h2>{{ device.name }}</h2>
+            <div>
+                <button class="button" onclick="connectDevice()">Connect</button>
+                <button class="button" onclick="requestStatus()">Refresh Status</button>
+                <button class="button" onclick="restartDevice()">Restart</button>
+                <button class="button" onclick="returnToAttendance()">Attendance Mode</button>
+            </div>
+        </div>
+        <div class="panel-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div>
+                    <div class="muted small">Device ID</div>
+                    <strong>{{ device.device_id }}</strong>
+                </div>
+                <div>
+                    <div class="muted small">Serial Port</div>
+                    <strong>{{ device.serial_port }} @ {{ device.baudrate }}</strong>
+                </div>
+                <div>
+                    <div class="muted small">Mode</div>
+                    <span class="badge">{{ device.get_mode_display }}</span>
+                </div>
+                <div>
+                    <div class="muted small">Status</div>
+                    <span class="badge {% if device.status == 'ONLINE' %}success{% elif device.status == 'ERROR' %}danger{% else %}warning{% endif %}">
+                        {{ device.get_status_display }}
+                    </span>
+                </div>
+                <div>
+                    <div class="muted small">Templates Stored</div>
+                    <strong>{{ device.template_count }}</strong>
+                </div>
+                <div>
+                    <div class="muted small">Firmware</div>
+                    <strong>{{ device.firmware_version|default:"Unknown" }}</strong>
+                </div>
+                <div>
+                    <div class="muted small">Last Seen</div>
+                    <strong>{{ device.last_seen_at|date:"M d, Y H:i:s"|default:"Never" }}</strong>
+                </div>
+                <div>
+                    <div class="muted small">Last Error</div>
+                    <strong style="color:var(--danger,#e53e3e);">{{ device.last_error|default:"None" }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <aside class="panel">
+        <div class="panel-header"><h2>Enrollment Requests</h2></div>
+        <div class="panel-body" style="max-height:400px;overflow-y:auto;">
+            {% for e in enrollments %}
+                <div style="border-bottom:1px solid var(--border,#e2e8f0);padding:10px 0;">
+                    <div style="display:flex;justify-content:space-between;">
+                        <strong>{{ e.employee.full_name }}</strong>
+                        <span class="badge {% if e.status == 'COMPLETED' %}success{% elif e.status == 'FAILED' %}danger{% elif e.status == 'IN_PROGRESS' %}warning{% endif %}">
+                            {{ e.get_status_display }}
+                        </span>
+                    </div>
+                    <div class="muted small">fp_id={{ e.fingerprint_id }} &middot; {{ e.requested_at|date:"M d, H:i" }}</div>
+                    {% if e.progress_message %}<div class="muted small">{{ e.progress_message }}</div>{% endif %}
+                    {% if e.error_message %}<div style="color:var(--danger,#e53e3e);font-size:0.8rem;">{{ e.error_message }}</div>{% endif %}
+                </div>
+            {% empty %}
+                <p class="muted">No enrollment requests for this device.</p>
+            {% endfor %}
+        </div>
+    </aside>
+</div>
+
+<div class="panel" style="margin-top:16px;">
+    <div class="panel-header"><h2>Command History</h2></div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Command</th><th>Status</th><th>Payload</th><th>Response</th><th>Error</th><th>Created</th></tr></thead>
+            <tbody>
+            {% for cmd in commands %}
+                <tr>
+                    <td><strong>{{ cmd.get_command_display }}</strong></td>
+                    <td><span class="badge {% if cmd.status == 'COMPLETED' %}success{% elif cmd.status == 'FAILED' %}danger{% elif cmd.status == 'SENT' or cmd.status == 'ACKNOWLEDGED' %}warning{% endif %}">{{ cmd.get_status_display }}</span></td>
+                    <td><code>{{ cmd.payload|truncatewords:8 }}</code></td>
+                    <td>{{ cmd.response|truncatewords:10|default:"—" }}</td>
+                    <td style="color:var(--danger,#e53e3e);">{{ cmd.error_message|truncatewords:10|default:"—" }}</td>
+                    <td>{{ cmd.created_at|date:"M d, H:i:s" }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="empty">No commands sent yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="panel" style="margin-top:16px;">
+    <div class="panel-header"><h2>Event Log</h2></div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Time</th><th>Type</th><th>Employee</th><th>Message</th><th>Error</th></tr></thead>
+            <tbody>
+            {% for ev in events %}
+                <tr>
+                    <td>{{ ev.created_at|date:"M d, H:i:s" }}</td>
+                    <td><span class="badge">{{ ev.event_type }}</span></td>
+                    <td>{{ ev.employee.full_name|default:"—" }}</td>
+                    <td>{{ ev.message|truncatewords:20 }}</td>
+                    <td style="color:var(--danger,#e53e3e);">{{ ev.error_message|truncatewords:10|default:"—" }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="empty">No events recorded.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+const CSRF = '{{ csrf_token }}';
+const DEVICE_PK = {{ device.pk }};
+function apiPost(url, body) {
+    return fetch(url, {method:'POST', headers:{'X-CSRFToken':CSRF,'Content-Type':'application/json'}, body: JSON.stringify(body||{})})
+        .then(r=>r.json().then(d=>{if(!r.ok) throw new Error(d.detail||d.status||'Request failed'); return d;}));
+}
+function connectDevice() { apiPost(`/devices/api/devices/${DEVICE_PK}/connect/`).then(d=>{alert(d.status);location.reload();}).catch(e=>alert('Error: '+e.message)); }
+function restartDevice() { if(!confirm('Restart?'))return; apiPost(`/devices/api/devices/${DEVICE_PK}/restart/`).then(d=>{alert(d.message||d.status);location.reload();}).catch(e=>alert('Error: '+e.message)); }
+function requestStatus() { apiPost(`/devices/api/devices/${DEVICE_PK}/request-status/`).then(d=>{alert(d.message||d.status);}).catch(e=>alert('Error: '+e.message)); }
+function returnToAttendance() { apiPost(`/devices/api/devices/${DEVICE_PK}/return-attendance/`).then(d=>{alert(d.message||d.status);location.reload();}).catch(e=>alert('Error: '+e.message)); }
+</script>
+{% endblock %}

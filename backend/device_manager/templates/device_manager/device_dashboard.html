@@ -1,0 +1,114 @@
+{% extends "attendance/base.html" %}
+
+{% block content %}
+<section class="metrics">
+    <article class="metric-card">
+        <div class="metric-label">Total Devices</div>
+        <div class="metric-value">{{ device_count }}</div>
+        <div class="metric-note">Registered hardware</div>
+    </article>
+    <article class="metric-card">
+        <div class="metric-label">Online</div>
+        <div class="metric-value">{{ online_count }}</div>
+        <div class="metric-note">Connected and reachable</div>
+    </article>
+    <article class="metric-card">
+        <div class="metric-label">Pending Commands</div>
+        <div class="metric-value">{{ pending_commands|length }}</div>
+        <div class="metric-note">Awaiting completion</div>
+    </article>
+    <article class="metric-card">
+        <div class="metric-label">Active Enrollments</div>
+        <div class="metric-value">{{ active_enrollments|length }}</div>
+        <div class="metric-note">In progress or queued</div>
+    </article>
+</section>
+
+<section class="grid-2">
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Devices</h2>
+            <a class="button subtle" href="{% url 'device_list' %}">View all</a>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Device</th><th>Mode</th><th>Status</th><th>Templates</th><th>Last Seen</th><th></th></tr>
+                </thead>
+                <tbody>
+                {% for d in devices %}
+                    <tr>
+                        <td>
+                            <div class="person-cell">
+                                <span class="avatar">{{ d.name|slice:":2" }}</span>
+                                <div>
+                                    <strong>{{ d.name }}</strong>
+                                    <div class="muted small">{{ d.device_id }} &middot; {{ d.serial_port }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td><span class="badge">{{ d.get_mode_display }}</span></td>
+                        <td><span class="badge {% if d.status == 'ONLINE' %}success{% elif d.status == 'ERROR' %}danger{% else %}warning{% endif %}">{{ d.get_status_display }}</span></td>
+                        <td>{{ d.template_count }}</td>
+                        <td>{{ d.last_seen_at|date:"M d, H:i"|default:"Never" }}</td>
+                        <td class="row-actions">
+                            <a class="button subtle" href="{% url 'device_detail' d.pk %}">Detail</a>
+                            <button class="button subtle" onclick="restartDevice({{ d.pk }})">Restart</button>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6" class="empty">No devices registered. Add one in Django admin.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <aside class="panel">
+        <div class="panel-header">
+            <h2>Active Enrollments</h2>
+            <a class="button primary" href="{% url 'enrollment_panel' %}">New Enrollment</a>
+        </div>
+        <div class="panel-body">
+            {% for e in active_enrollments %}
+                <div style="border-bottom:1px solid var(--border,#e2e8f0);padding:12px 0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <strong>{{ e.employee.full_name }}</strong>
+                        <span class="badge {% if e.status == 'IN_PROGRESS' %}success{% elif e.status == 'FAILED' %}danger{% else %}warning{% endif %}">{{ e.get_status_display }}</span>
+                    </div>
+                    <div class="muted small">{{ e.employee.organization_id }} &middot; fp_id={{ e.fingerprint_id }}</div>
+                    {% if e.progress_message %}<div class="muted small" style="margin-top:4px;">{{ e.progress_message }}</div>{% endif %}
+                </div>
+            {% empty %}
+                <p class="muted">No active enrollments.</p>
+            {% endfor %}
+        </div>
+
+        <div class="panel-header"><h2>Recent Events</h2></div>
+        <div class="panel-body" style="max-height:300px;overflow-y:auto;">
+            {% for ev in recent_events %}
+                <div style="border-bottom:1px solid var(--border,#e2e8f0);padding:8px 0;font-size:0.85rem;">
+                    <div style="display:flex;justify-content:space-between;">
+                        <span class="badge" style="font-size:0.75rem;">{{ ev.event_type }}</span>
+                        <span class="muted">{{ ev.created_at|date:"H:i:s" }}</span>
+                    </div>
+                    <div>{{ ev.message|truncatewords:20 }}</div>
+                    {% if ev.error_message %}<div style="color:var(--danger,#e53e3e);">{{ ev.error_message|truncatewords:15 }}</div>{% endif %}
+                </div>
+            {% empty %}
+                <p class="muted">No events yet.</p>
+            {% endfor %}
+        </div>
+    </aside>
+</section>
+
+<script>
+function restartDevice(deviceId) {
+    if (!confirm('Restart this device?')) return;
+    fetch(`/devices/api/devices/${deviceId}/restart/`, {method:'POST', headers:{'X-CSRFToken': '{{ csrf_token }}'}})
+        .then(r => r.json())
+        .then(d => { alert(d.message || d.status); location.reload(); })
+        .catch(() => alert('Request failed'));
+}
+</script>
+{% endblock %}

@@ -27,6 +27,7 @@ urlpatterns = [
     path('notifications/', views.NotificationListView.as_view(), name='notification_list'),
     path('roles/', views.UserRolesView.as_view(), name='user_roles'),
     path('settings/', views.SystemSettingsView.as_view(), name='system_settings'),
+    path('enroll/<int:enrollment_id>/scan/', views.enroll_scan_view, name='enroll_scan'),
     path('api/attendance/', views.attendance_api, name='attendance_api'),
     path('api/enrollment/next/', views.enrollment_next_api, name='enrollment_next_api'),
     path('api/enrollment/<int:request_id>/complete/', views.enrollment_complete_api, name='enrollment_complete_api'),
