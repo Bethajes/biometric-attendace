@@ -2,11 +2,11 @@ from datetime import date, datetime, time
 
 from django.test import TestCase
 from django.utils import timezone
+from organizations.models import Department
 
 from .models import (
     AttendanceLog,
     AttendanceRecord,
-    Department,
     Employee,
     EmployeeSchedule,
     Holiday,

@@ -40,11 +40,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize',
     # Third party apps
     'channels',
     'rest_framework',
     'corsheaders',
     # Local apps
+    'organizations',
     'attendance',
     'device_manager',
 ]
@@ -82,6 +84,10 @@ WSGI_APPLICATION = 'config.wsgi.application'
 ASGI_APPLICATION = 'config.asgi.application'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/login/'
 
 # Channels — Redis backend (required for multi-process: daphne + listen_devices)
 # Start Redis:  docker run -d --name redis -p 6379:6379 redis:7-alpine

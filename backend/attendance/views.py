@@ -17,17 +17,23 @@ from django.views.generic import CreateView, DetailView, TemplateView, UpdateVie
 from django.views.generic.list import ListView
 
 from .forms import (
+    AttendancePolicyForm,
     DepartmentForm,
     EmployeeForm,
     EmployeeScheduleForm,
     HolidayForm,
     LeaveRequestForm,
+    OvertimeRequestForm,
+    RemoteWorkLogForm,
+    ScheduleTemplateForm,
     ShiftForm,
+    SiteVisitForm,
 )
+from organizations.models import Department
 from .models import (
     AttendanceLog,
+    AttendancePolicy,
     AttendanceRecord,
-    Department,
     Employee,
     EmployeeSchedule,
     EnrollmentRequest,
@@ -35,7 +41,11 @@ from .models import (
     LeaveBalance,
     LeaveRequest,
     Notification,
+    OvertimeRequest,
+    RemoteWorkLog,
+    ScheduleTemplate,
     Shift,
+    SiteVisit,
     SystemSetting,
 )
 from .services.attendance_engine import AttendanceEngine
@@ -56,11 +66,16 @@ class EnterpriseContextMixin:
             ('employees', 'Employees', 'employee_list'),
             ('departments', 'Departments', 'department_list'),
             ('schedules', 'Schedules', 'schedule_list'),
+            ('templates', 'Templates', 'template_list'),
             ('shifts', 'Shifts', 'shift_list'),
             ('attendance', 'Attendance', 'attendance_records'),
             ('devices', 'Devices', 'device_dashboard'),
             ('leave', 'Leave', 'leave_list'),
             ('holidays', 'Holidays', 'holiday_list'),
+            ('overtime', 'Overtime', 'overtime_list'),
+            ('remote', 'Remote Work', 'remote_list'),
+            ('sites', 'Site Visits', 'site_list'),
+            ('policies', 'Policies', 'policy_list'),
             ('reports', 'Reports', 'reports'),
             ('notifications', 'Notifications', 'notification_list'),
             ('roles', 'User Roles', 'user_roles'),
@@ -175,7 +190,7 @@ class DashboardView(EnterpriseContextMixin, TemplateView):
                 total=Sum('overtime_minutes')
             )['total'] or 0,
             'recent_logs': AttendanceLog.objects.select_related('employee', 'employee__department').order_by('-timestamp')[:8],
-            'department_stats': Department.objects.annotate(employee_total=Count('employee')).order_by('name')[:8],
+            'department_stats': Department.objects.annotate(employee_total=Count('employee_set')).order_by('name')[:8],
             'status_breakdown': records_today.values('status').annotate(total=Count('id')).order_by('status'),
             'notifications': Notification.objects.order_by('-created_at')[:5],
         })
@@ -269,7 +284,7 @@ class DepartmentListView(EnterpriseListMixin):
     export_fields = [('name', 'Name'), ('code', 'Code'), ('employee_count', 'Employees'), ('is_active', 'Active')]
 
     def get_queryset(self):
-        queryset = Department.objects.annotate(employee_count=Count('employee')).select_related('manager')
+        queryset = Department.objects.annotate(employee_count=Count('employee_set')).select_related('manager', 'company')
         query = self.request.GET.get('q', '').strip()
         if query:
             queryset = queryset.filter(Q(name__icontains=query) | Q(code__icontains=query))
@@ -541,11 +556,16 @@ def attendance_api(request):
                 logger.warning('Unregistered fingerprint attempt: %s', fp_id)
                 return JsonResponse({'error': 'Unregistered fingerprint', 'fingerprint_id': fp_id}, status=404)
 
+            engine = AttendanceEngine()
+            allowed, cooldown_msg = engine.is_scan_allowed(employee)
+            if not allowed:
+                return JsonResponse({'error': cooldown_msg, 'status': 'cooldown'}, status=429)
+
             today = timezone.localdate()
             last_scan = AttendanceLog.objects.filter(employee=employee, timestamp__date=today).order_by('-timestamp').first()
             scan_type = 'OUT' if last_scan and last_scan.scan_type == 'IN' else 'IN'
             log_entry = AttendanceLog.objects.create(employee=employee, scan_type=scan_type)
-            record = AttendanceEngine().calculate_employee_day(employee, today)
+            record = engine.calculate_employee_day(employee, today)
 
             return JsonResponse({
                 'status': 'success',
@@ -652,3 +672,241 @@ def enroll_scan_view(request, enrollment_id):
         'fingerprint_id': enrollment.fingerprint_id,
         'page_title': f'Enrolling — {enrollment.employee.full_name}',
     })
+
+
+# ---------------------------------------------------------------------------
+# Overtime Requests
+# ---------------------------------------------------------------------------
+
+class OvertimeRequestListView(EnterpriseListMixin):
+    model = OvertimeRequest
+    template_name = 'attendance/overtime_list.html'
+    page_title = 'Overtime Requests'
+    active_nav = 'overtime'
+    search_fields = ['employee__first_name', 'employee__last_name', 'employee__organization_id']
+    default_ordering = '-date'
+    export_filename = 'overtime'
+    export_fields = [
+        ('employee__full_name', 'Employee'),
+        ('date', 'Date'),
+        ('requested_minutes', 'Requested'),
+        ('approved_minutes', 'Approved'),
+        ('status', 'Status'),
+    ]
+
+    def get_queryset(self):
+        qs = super().get_queryset().select_related('employee', 'approved_by')
+        status = self.request.GET.get('status')
+        if status:
+            qs = qs.filter(status=status)
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['status_choices'] = OvertimeRequest.Status.choices
+        return context
+
+
+class OvertimeRequestCreateView(EnterpriseContextMixin, CreateView):
+    model = OvertimeRequest
+    form_class = OvertimeRequestForm
+    template_name = 'attendance/form.html'
+    success_url = reverse_lazy('overtime_list')
+    page_title = 'Request Overtime'
+    active_nav = 'overtime'
+
+
+class OvertimeRequestUpdateView(OvertimeRequestCreateView, UpdateView):
+    page_title = 'Edit Overtime Request'
+
+
+@csrf_exempt
+def overtime_approve_api(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    overtime = get_object_or_404(OvertimeRequest, pk=pk)
+    data = json.loads(request.body or '{}')
+    action = data.get('action', '')
+    if action == 'approve':
+        overtime.status = OvertimeRequest.Status.APPROVED
+        overtime.approved_minutes = data.get('approved_minutes', overtime.requested_minutes)
+        overtime.approved_by = request.user if request.user.is_authenticated else None
+    elif action == 'reject':
+        overtime.status = OvertimeRequest.Status.REJECTED
+    overtime.save(update_fields=['status', 'approved_minutes', 'approved_by'])
+    return JsonResponse({'status': 'ok', 'new_status': overtime.status})
+
+
+# ---------------------------------------------------------------------------
+# Remote Work Logs
+# ---------------------------------------------------------------------------
+
+class RemoteWorkLogListView(EnterpriseListMixin):
+    model = RemoteWorkLog
+    template_name = 'attendance/remote_list.html'
+    page_title = 'Remote Work'
+    active_nav = 'remote'
+    search_fields = ['employee__first_name', 'employee__last_name']
+    default_ordering = '-date'
+    export_filename = 'remote_work'
+    export_fields = [
+        ('employee__full_name', 'Employee'),
+        ('date', 'Date'),
+        ('status', 'Status'),
+        ('hours_worked', 'Hours'),
+    ]
+
+    def get_queryset(self):
+        qs = super().get_queryset().select_related('employee')
+        status = self.request.GET.get('status')
+        if status:
+            qs = qs.filter(status=status)
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['status_choices'] = RemoteWorkLog.Status.choices
+        return context
+
+
+class RemoteWorkLogCreateView(EnterpriseContextMixin, CreateView):
+    model = RemoteWorkLog
+    form_class = RemoteWorkLogForm
+    template_name = 'attendance/form.html'
+    success_url = reverse_lazy('remote_list')
+    page_title = 'Log Remote Work'
+    active_nav = 'remote'
+
+
+class RemoteWorkLogUpdateView(RemoteWorkLogCreateView, UpdateView):
+    page_title = 'Edit Remote Work'
+
+
+# ---------------------------------------------------------------------------
+# Site Visits
+# ---------------------------------------------------------------------------
+
+class SiteVisitListView(EnterpriseListMixin):
+    model = SiteVisit
+    template_name = 'attendance/site_list.html'
+    page_title = 'Site Visits'
+    active_nav = 'sites'
+    search_fields = ['employee__first_name', 'employee__last_name', 'location_name']
+    default_ordering = '-date'
+    export_filename = 'site_visits'
+    export_fields = [
+        ('employee__full_name', 'Employee'),
+        ('date', 'Date'),
+        ('location_name', 'Location'),
+        ('duration_minutes', 'Duration'),
+    ]
+
+    def get_queryset(self):
+        return super().get_queryset().select_related('employee')
+
+
+class SiteVisitCreateView(EnterpriseContextMixin, CreateView):
+    model = SiteVisit
+    form_class = SiteVisitForm
+    template_name = 'attendance/form.html'
+    success_url = reverse_lazy('site_list')
+    page_title = 'Log Site Visit'
+    active_nav = 'sites'
+
+
+class SiteVisitUpdateView(SiteVisitCreateView, UpdateView):
+    page_title = 'Edit Site Visit'
+
+
+# ---------------------------------------------------------------------------
+# Schedule Templates
+# ---------------------------------------------------------------------------
+
+class ScheduleTemplateListView(EnterpriseListMixin):
+    model = ScheduleTemplate
+    template_name = 'attendance/template_list.html'
+    page_title = 'Schedule Templates'
+    active_nav = 'templates'
+    search_fields = ['name']
+    default_ordering = 'name'
+    export_filename = 'schedule_templates'
+    export_fields = [('name', 'Name'), ('template_type', 'Type'), ('is_active', 'Active')]
+
+    def get_queryset(self):
+        qs = super().get_queryset().select_related('shift')
+        t = self.request.GET.get('type')
+        if t:
+            qs = qs.filter(template_type=t)
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['template_types'] = ScheduleTemplate.TemplateType.choices
+        return context
+
+
+class ScheduleTemplateCreateView(EnterpriseContextMixin, CreateView):
+    model = ScheduleTemplate
+    form_class = ScheduleTemplateForm
+    template_name = 'attendance/form.html'
+    success_url = reverse_lazy('template_list')
+    page_title = 'Add Template'
+    active_nav = 'templates'
+
+
+class ScheduleTemplateUpdateView(ScheduleTemplateCreateView, UpdateView):
+    page_title = 'Edit Template'
+
+
+# ---------------------------------------------------------------------------
+# Attendance Policies
+# ---------------------------------------------------------------------------
+
+class AttendancePolicyListView(EnterpriseListMixin):
+    model = AttendancePolicy
+    template_name = 'attendance/policy_list.html'
+    page_title = 'Attendance Policies'
+    active_nav = 'policies'
+    search_fields = ['name']
+    default_ordering = 'name'
+    export_filename = 'policies'
+    export_fields = [
+        ('name', 'Name'),
+        ('grace_period_minutes', 'Grace (min)'),
+        ('late_threshold_minutes', 'Late (min)'),
+        ('auto_checkout_enabled', 'Auto Checkout'),
+    ]
+
+    def get_queryset(self):
+        return super().get_queryset()
+
+
+class AttendancePolicyCreateView(EnterpriseContextMixin, CreateView):
+    model = AttendancePolicy
+    form_class = AttendancePolicyForm
+    template_name = 'attendance/form.html'
+    success_url = reverse_lazy('policy_list')
+    page_title = 'Add Policy'
+    active_nav = 'policies'
+
+
+class AttendancePolicyUpdateView(AttendancePolicyCreateView, UpdateView):
+    page_title = 'Edit Policy'
+
+
+# ---------------------------------------------------------------------------
+# Login / Logout
+# ---------------------------------------------------------------------------
+
+from django.contrib.auth import authenticate, login, logout as auth_logout
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.views import LoginView, LogoutView
+
+
+class SmartLoginView(LoginView):
+    template_name = 'attendance/login.html'
+    redirect_authenticated_user = True
+
+
+class SmartLogoutView(LogoutView):
+    next_page = 'login'

@@ -600,6 +600,23 @@ class HardwareService:
             )
             return
 
+        # ── 1b. Duplicate scan prevention ────────────────────────────
+        engine = AttendanceEngine()
+        allowed, cooldown_msg = engine.is_scan_allowed(employee)
+        if not allowed:
+            print(f"[MATCH] Scan rejected: {cooldown_msg}")
+            self._log_event(
+                device, DeviceEvent.EventType.ATTENDANCE_EVENT,
+                message=f'Scan rejected for {employee.full_name}: {cooldown_msg}',
+                employee=employee, fingerprint_id=fingerprint_id,
+            )
+            self._push_attendance_broadcast(
+                device, employee=employee, fingerprint_id=fingerprint_id,
+                scan_type=None, status='COOLDOWN',
+                message=cooldown_msg,
+            )
+            return
+
         # ── 2. Determine scan type (IN / OUT) ────────────────────────
         today = timezone.localdate()
         last_scan = (
@@ -627,7 +644,7 @@ class HardwareService:
 
         # ── 4. Calculate / update AttendanceRecord ────────────────────
         try:
-            record = AttendanceEngine().calculate_employee_day(employee, today)
+            record = engine.calculate_employee_day(employee, today)
             print(f"[MATCH] AttendanceRecord updated: status={record.status}, "
                   f"worked={record.worked_minutes}min, late={record.minutes_late}min, "
                   f"overtime={record.overtime_minutes}min")

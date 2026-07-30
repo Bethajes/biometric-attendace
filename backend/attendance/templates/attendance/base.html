@@ -1,11 +1,12 @@
 {% load static %}
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ page_title|default:"Dashboard" }} | SmartHR Attendance</title>
+    <title>{{ page_title|default:"Dashboard" }} | SmartAttend Enterprise</title>
     <link rel="stylesheet" href="{% static 'attendance/css/app.css' %}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 <body>
     <div class="app-shell">
@@ -26,6 +27,14 @@
                     </a>
                 {% endfor %}
             </nav>
+            <div class="sidebar-footer">
+                {% if user.is_authenticated %}
+                <a class="nav-link" href="{% url 'logout' %}">
+                    <span class="nav-icon">&#x2190;</span>
+                    <span>Sign Out</span>
+                </a>
+                {% endif %}
+            </div>
         </aside>
 
         <main class="main">
@@ -35,6 +44,9 @@
                     <h1>{{ page_title|default:"Dashboard" }}</h1>
                 </div>
                 <div class="top-actions">
+                    <button class="icon-button theme-toggle" id="theme-toggle" title="Toggle dark mode" type="button">
+                        <span id="theme-icon">&#9790;</span>
+                    </button>
                     <a class="icon-button" title="Export CSV" href="?{{ request.GET.urlencode }}{% if request.GET.urlencode %}&{% endif %}export=csv">CSV</a>
                     <a class="icon-button" title="Open Django admin" href="/admin/">Admin</a>
                 </div>

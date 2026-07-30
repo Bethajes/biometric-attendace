@@ -1,0 +1,37 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<section class="panel">
+    <div class="panel-header">
+        <h2>Attendance Policies</h2>
+        <a class="button primary" href="{% url 'policy_add' %}">+ Add Policy</a>
+    </div>
+    <div class="panel-body" style="padding-bottom:0;">
+        <form class="filter-bar" method="get">
+            <input type="search" name="q" placeholder="Search..." value="{{ request.GET.q|default:'' }}">
+            <button class="button" type="submit">Filter</button>
+        </form>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Name</th><th>Grace</th><th>Late</th><th>Auto Checkout</th><th>Dup Prevention</th><th>Deductions</th><th>Active</th><th></th></tr></thead>
+            <tbody>
+            {% for obj in object_list %}
+                <tr>
+                    <td><strong>{{ obj.name }}</strong></td>
+                    <td>{{ obj.grace_period_minutes }}min</td>
+                    <td>{{ obj.late_threshold_minutes }}min</td>
+                    <td>{% if obj.auto_checkout_enabled %}<span class="badge success">Yes</span>{% else %}<span class="badge muted">No</span>{% endif %}</td>
+                    <td>{% if obj.duplicate_scan_prevention %}<span class="badge success">Yes ({% if obj.duplicate_scan_cooldown_seconds %}{{ obj.duplicate_scan_cooldown_seconds }}s{% endif %})</span>{% else %}<span class="badge muted">No</span>{% endif %}</td>
+                    <td>{% if obj.break_deducted %}Break{% endif %}{% if obj.lunch_deducted %} Lunch{% endif %}{% if not obj.break_deducted and not obj.lunch_deducted %}None{% endif %}</td>
+                    <td>{% if obj.is_active %}<span class="badge success">Active</span>{% else %}<span class="badge muted">Inactive</span>{% endif %}</td>
+                    <td><a class="button subtle" href="{% url 'policy_edit' obj.pk %}">Edit</a></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="8" class="empty">No attendance policies created.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "attendance/_pagination.html" %}
+</section>
+{% endblock %}

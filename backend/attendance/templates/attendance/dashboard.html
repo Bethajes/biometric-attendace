@@ -38,6 +38,7 @@
     <aside class="panel">
         <div class="panel-header"><h2>Today by Status</h2></div>
         <div class="panel-body">
+            <canvas id="status-chart" height="200"></canvas>
             {% for row in status_breakdown %}
                 <p style="display:flex;justify-content:space-between;margin-bottom:12px;"><span>{{ row.status }}</span><strong>{{ row.total }}</strong></p>
             {% empty %}
@@ -46,6 +47,7 @@
         </div>
         <div class="panel-header"><h2>Departments</h2></div>
         <div class="panel-body">
+            <canvas id="dept-chart" height="200"></canvas>
             {% for dept in department_stats %}
                 <p style="display:flex;justify-content:space-between;margin-bottom:12px;"><span>{{ dept.name }}</span><strong>{{ dept.employee_total }}</strong></p>
             {% empty %}
@@ -57,82 +59,89 @@
 
 <script>
 (function() {
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = wsProtocol + '//' + window.location.host + '/ws/dashboard-live/';
-    let socket = null;
-    let reconnectDelay = 1000;
+    // Charts
+    var statusCtx = document.getElementById('status-chart');
+    var deptCtx = document.getElementById('dept-chart');
+
+    if (statusCtx) {
+        var statusData = [{% for row in status_breakdown %}{ label: '{{ row.status }}', value: {{ row.total }} }{% if not forloop.last %},{% endif %}{% endfor %}];
+        if (statusData.length > 0) {
+            new Chart(statusCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: statusData.map(function(d){ return d.label; }),
+                    datasets: [{ data: statusData.map(function(d){ return d.value; }),
+                        backgroundColor: ['#38a169','#d69e2e','#e53e3e','#4299e1','#9f7aea','#ed8936','#718096'],
+                        borderWidth: 2
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 8 } } } }
+            });
+        }
+    }
+
+    if (deptCtx) {
+        var deptData = [{% for dept in department_stats %}{ label: '{{ dept.name }}', value: {{ dept.employee_total }} }{% if not forloop.last %},{% endif %}{% endfor %}];
+        if (deptData.length > 0) {
+            new Chart(deptCtx, {
+                type: 'bar',
+                data: {
+                    labels: deptData.map(function(d){ return d.label; }),
+                    datasets: [{ label: 'Employees', data: deptData.map(function(d){ return d.value; }),
+                        backgroundColor: '#36a3c2', borderRadius: 4
+                    }]
+                },
+                options: { responsive: true, indexAxis: 'y', plugins: { legend: { display: false } } }
+            });
+        }
+    }
+
+    // WebSocket
+    var wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var wsUrl = wsProtocol + '//' + window.location.host + '/ws/dashboard-live/';
+    var socket = null;
+    var reconnectDelay = 1000;
 
     function connect() {
         socket = new WebSocket(wsUrl);
-
-        socket.onopen = function() {
-            console.log('[Dashboard WS] Connected');
-            reconnectDelay = 1000;
-        };
-
+        socket.onopen = function() { reconnectDelay = 1000; };
         socket.onmessage = function(e) {
-            const data = JSON.parse(e.data);
-            if (data.type === 'attendance_event') {
-                appendActivityRow(data);
-            }
+            var data = JSON.parse(e.data);
+            if (data.type === 'attendance_event') appendActivityRow(data);
         };
-
         socket.onclose = function() {
-            console.log('[Dashboard WS] Disconnected, reconnecting in ' + reconnectDelay + 'ms');
             setTimeout(function() {
                 reconnectDelay = Math.min(reconnectDelay * 2, 30000);
                 connect();
             }, reconnectDelay);
         };
-
-        socket.onerror = function() {
-            socket.close();
-        };
+        socket.onerror = function() { socket.close(); };
     }
 
     function appendActivityRow(data) {
         var tbody = document.getElementById('live-activity-body');
         if (!tbody) return;
-
         var emptyRow = document.getElementById('empty-row');
         if (emptyRow) emptyRow.remove();
-
         var initials = '?';
         if (data.employee_name) {
             var parts = data.employee_name.split(' ');
             initials = parts[0].charAt(0) + (parts.length > 1 ? parts[parts.length - 1].charAt(0) : '');
         }
-
         var scanBadgeClass = data.scan_type === 'IN' ? 'success' : 'warning';
         var scanLabel = data.scan_type === 'IN' ? 'Check-In' : 'Check-Out';
-
         var ts = '';
         if (data.timestamp) {
             var d = new Date(data.timestamp);
             var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-            ts = months[d.getMonth()] + ' ' + d.getDate() + ', ' +
-                 String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+            ts = months[d.getMonth()] + ' ' + d.getDate() + ', ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
         }
-
         var row = document.createElement('tr');
         row.style.background = 'var(--accent-light, #f0fff4)';
-        row.innerHTML =
-            '<td><div class="person-cell">' +
-                '<span class="avatar">' + initials + '</span>' +
-                '<div><strong>' + (data.employee_name || 'Unknown') + '</strong>' +
-                '<div class="muted small">' + (data.organization_id || '') + '</div></div>' +
-            '</div></td>' +
-            '<td>' + (data.department || 'Unassigned') + '</td>' +
-            '<td><span class="badge ' + scanBadgeClass + '">' + scanLabel + '</span></td>' +
-            '<td>' + ts + '</td>';
-
+        row.innerHTML = '<td><div class="person-cell"><span class="avatar">' + initials + '</span><div><strong>' + (data.employee_name || 'Unknown') + '</strong><div class="muted small">' + (data.organization_id || '') + '</div></div></div></td><td>' + (data.department || 'Unassigned') + '</td><td><span class="badge ' + scanBadgeClass + '">' + scanLabel + '</span></td><td>' + ts + '</td>';
         tbody.insertBefore(row, tbody.firstChild);
-
         setTimeout(function() { row.style.background = ''; }, 2000);
-
-        while (tbody.children.length > 20) {
-            tbody.removeChild(tbody.lastChild);
-        }
+        while (tbody.children.length > 20) tbody.removeChild(tbody.lastChild);
     }
 
     connect();

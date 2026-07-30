@@ -1,0 +1,83 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login | SmartAttend Enterprise</title>
+    <link rel="stylesheet" href="{% static 'attendance/css/app.css' %}">
+    <style>
+        .login-shell {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: linear-gradient(135deg, #102638 0%, #1a3a50 50%, #126b8f 100%);
+        }
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            background: var(--surface);
+            border-radius: 16px;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.25);
+            padding: 40px 36px;
+        }
+        .login-brand {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .login-brand .brand-mark {
+            width: 56px;
+            height: 56px;
+            font-size: 1.4rem;
+            margin: 0 auto 12px;
+        }
+        .login-brand h2 {
+            font-size: 1.4rem;
+            margin: 0;
+        }
+        .login-brand p {
+            color: var(--muted);
+            font-size: 0.88rem;
+            margin-top: 4px;
+        }
+        .login-card .errorlist {
+            margin-bottom: 12px;
+        }
+        .login-card form p {
+            display: grid;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+        .login-card form button {
+            width: 100%;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-shell">
+        <div class="login-card">
+            <div class="login-brand">
+                <span class="brand-mark">SA</span>
+                <h2>SmartAttend Enterprise</h2>
+                <p>Sign in to your account</p>
+            </div>
+            {% if form.errors %}
+                <div class="errorlist">Invalid username or password.</div>
+            {% endif %}
+            <form method="post">
+                {% csrf_token %}
+                <p>
+                    <label for="id_username">Username</label>
+                    <input type="text" name="username" id="id_username" autofocus required>
+                </p>
+                <p>
+                    <label for="id_password">Password</label>
+                    <input type="password" name="password" id="id_password" required>
+                </p>
+                <button class="button primary" type="submit">Sign In</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

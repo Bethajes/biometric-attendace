@@ -1,0 +1,36 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<section class="panel">
+    <div class="panel-header">
+        <h2>Overtime Requests</h2>
+        <a class="button primary" href="{% url 'overtime_add' %}">+ Request</a>
+    </div>
+    <div class="panel-body" style="padding-bottom:0;">
+        <form class="filter-bar" method="get">
+            <input type="search" name="q" placeholder="Search..." value="{{ request.GET.q|default:'' }}">
+            <select name="status"><option value="">All Status</option>{% for val,label in status_choices %}<option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+            <button class="button" type="submit">Filter</button>
+        </form>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Employee</th><th>Date</th><th>Requested</th><th>Approved</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            {% for obj in object_list %}
+                <tr>
+                    <td><div class="person-cell"><span class="avatar">{{ obj.employee.first_name|slice:":1" }}{{ obj.employee.last_name|slice:":1" }}</span><div><strong>{{ obj.employee.full_name }}</strong><div class="muted small">{{ obj.employee.organization_id }}</div></div></div></td>
+                    <td>{{ obj.date }}</td>
+                    <td>{{ obj.requested_minutes }}min</td>
+                    <td>{% if obj.approved_minutes %}{{ obj.approved_minutes }}min{% else %}-{% endif %}</td>
+                    <td><span class="badge {% if obj.status == 'APPROVED' %}success{% elif obj.status == 'REJECTED' %}danger{% else %}warning{% endif %}">{{ obj.get_status_display }}</span></td>
+                    <td><a class="button subtle" href="{% url 'overtime_edit' obj.pk %}">Edit</a></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="empty">No overtime requests.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "attendance/_pagination.html" %}
+</section>
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<section class="panel">
+    <div class="panel-header">
+        <h2>Site Visits</h2>
+        <a class="button primary" href="{% url 'site_add' %}">+ Log Visit</a>
+    </div>
+    <div class="panel-body" style="padding-bottom:0;">
+        <form class="filter-bar" method="get">
+            <input type="search" name="q" placeholder="Search..." value="{{ request.GET.q|default:'' }}">
+            <button class="button" type="submit">Filter</button>
+        </form>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Employee</th><th>Date</th><th>Location</th><th>Duration</th><th></th></tr></thead>
+            <tbody>
+            {% for obj in object_list %}
+                <tr>
+                    <td><div class="person-cell"><span class="avatar">{{ obj.employee.first_name|slice:":1" }}{{ obj.employee.last_name|slice:":1" }}</span><div><strong>{{ obj.employee.full_name }}</strong></div></div></td>
+                    <td>{{ obj.date }}</td>
+                    <td>{{ obj.location_name }}</td>
+                    <td>{{ obj.duration_minutes }}min</td>
+                    <td><a class="button subtle" href="{% url 'site_edit' obj.pk %}">Edit</a></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="empty">No site visits logged.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "attendance/_pagination.html" %}
+</section>
+{% endblock %}
