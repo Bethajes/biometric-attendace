@@ -1,0 +1,147 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>Time Tracking: {{ employee.full_name }}</h2>
+        <div class="table-actions">
+            <a class="button" href="{% url 'time_tracking_dashboard' %}">Back to Dashboard</a>
+            {% if month_summary %}
+            <a class="button" href="{% url 'time_tracking_monthly' employee.pk month_summary.year month_summary.month %}">Monthly Summary</a>
+            {% endif %}
+            <a class="button" href="{% url 'time_tracking_audit' employee.pk %}">Audit Trail</a>
+        </div>
+    </div>
+    <div class="panel-body">
+        <div class="info-bar">
+            <div class="info-item">
+                <span class="info-label">Employee ID</span>
+                <span class="info-value">{{ employee.organization_id }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Department</span>
+                <span class="info-value">{{ employee.department|default:"-" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Job Title</span>
+                <span class="info-value">{{ employee.job_title }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Shift</span>
+                <span class="info-value">{{ current_schedule.shift.name|default:"Not Scheduled" }}</span>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card highlight">
+                <div class="stat-label">Today Worked</div>
+                <div class="stat-value">{{ today.worked_hours }}h</div>
+                <div class="stat-sub">{{ today.worked_minutes }} minutes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Today Expected</div>
+                <div class="stat-value">{{ today.expected_hours }}h</div>
+                <div class="stat-sub">{{ today.expected_minutes }} minutes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Today Late</div>
+                <div class="stat-value">{{ today.late_minutes }}m</div>
+                <div class="stat-sub">{{ today.status }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Today Overtime</div>
+                <div class="stat-value">{{ today.overtime_hours }}h</div>
+                <div class="stat-sub">{{ today.overtime_minutes }} minutes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Week Worked</div>
+                <div class="stat-value">{{ week.worked_hours }}h</div>
+                <div class="stat-sub">{{ week.expected_hours }}h expected</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Week Attendance</div>
+                <div class="stat-value">{{ week.attendance_percentage }}%</div>
+                <div class="stat-sub">{{ week.present_days }} present, {{ week.absent_days }} absent</div>
+            </div>
+            <div class="stat-card highlight">
+                <div class="stat-label">Month Worked</div>
+                <div class="stat-value">{{ month.worked_hours }}h</div>
+                <div class="stat-sub">{{ month.expected_hours }}h expected</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Month Attendance</div>
+                <div class="stat-value">{{ month.attendance_percentage }}%</div>
+                <div class="stat-sub">{{ month.missing_hours }}h missing</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Month Late</div>
+                <div class="stat-value">{{ month.late_minutes }}m</div>
+                <div class="stat-sub">Total late minutes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Month Overtime</div>
+                <div class="stat-value">{{ month.overtime_hours }}h</div>
+                <div class="stat-sub">{{ month.weekday_ot_hours }}h weekday, {{ month.weekend_ot_hours }}h weekend</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Month Holiday</div>
+                <div class="stat-value">{{ month.holiday_hours }}h</div>
+                <div class="stat-sub">{{ month.weekend_hours }}h weekend, {{ month.night_hours }}h night</div>
+            </div>
+        </div>
+
+        <h3 style="margin-top: 24px;">Timeline (Last 30 Days)</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Check In</th>
+                        <th>Check Out</th>
+                        <th>Worked</th>
+                        <th>Expected</th>
+                        <th>Late</th>
+                        <th>Early Leave</th>
+                        <th>Break</th>
+                        <th>Lunch</th>
+                        <th>OT</th>
+                        <th>%</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ds in daily_summaries %}
+                    <tr>
+                        <td>{{ ds.date }}</td>
+                        <td>
+                            {% if ds.on_leave %}
+                            <span class="badge info">On Leave: {{ ds.leave_type }}</span>
+                            {% elif ds.is_holiday %}
+                            <span class="badge warning">Holiday{% if ds.worked_minutes > 0 %} (Worked){% endif %}</span>
+                            {% elif ds.is_weekend %}
+                            <span class="badge secondary">Weekend{% if ds.worked_minutes > 0 %} (Worked){% endif %}</span>
+                            {% else %}
+                            <span class="badge {% if ds.worked_minutes == 0 and ds.expected_minutes > 0 %}danger{% elif ds.late_minutes > 0 %}warning{% elif ds.overtime_minutes > 0 %}info{% else %}success{% endif %}">
+                                {% if ds.worked_minutes == 0 and ds.expected_minutes > 0 %}Absent{% elif ds.late_minutes > 0 %}Late{% elif ds.overtime_minutes > 0 %}Overtime{% else %}Present{% endif %}
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td>{{ ds.check_in|time:"H:i"|default:"-" }}</td>
+                        <td>{{ ds.check_out|time:"H:i"|default:"-" }}</td>
+                        <td>{{ ds.worked_minutes }}m</td>
+                        <td>{{ ds.expected_minutes }}m</td>
+                        <td>{{ ds.late_minutes }}m</td>
+                        <td>{{ ds.early_leave_minutes }}m</td>
+                        <td>{{ ds.break_minutes }}m</td>
+                        <td>{{ ds.lunch_minutes }}m</td>
+                        <td>{{ ds.overtime_minutes }}m</td>
+                        <td>{{ ds.attendance_percentage }}%</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="12" class="empty">No daily summaries for this period.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

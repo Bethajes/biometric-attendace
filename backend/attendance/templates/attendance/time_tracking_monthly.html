@@ -1,0 +1,169 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>Monthly Time Summary: {{ employee.full_name }} - {{ year }}-{{ month|stringformat:"02d" }}</h2>
+        <div class="table-actions">
+            <a class="button" href="{% url 'time_tracking_detail' employee.pk %}">Back to Employee</a>
+            <a class="button" href="{% url 'time_tracking_audit' employee.pk %}">Audit Trail</a>
+        </div>
+    </div>
+    <div class="panel-body">
+        <div class="info-bar">
+            <div class="info-item">
+                <span class="info-label">Employee ID</span>
+                <span class="info-value">{{ employee.organization_id }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Department</span>
+                <span class="info-value">{{ employee.department|default:"-" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Month</span>
+                <span class="info-value">{{ year }}-{{ month|stringformat:"02d" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Status</span>
+                <span class="info-value">
+                    {% if monthly_summary.recalculation_count > 0 %}
+                    <span class="badge warning">Recalculated {{ monthly_summary.recalculation_count }} times</span>
+                    {% else %}
+                    <span class="badge success">Original</span>
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card highlight">
+                <div class="stat-label">Worked Hours</div>
+                <div class="stat-value">{{ monthly_summary.worked_hours }}h</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Expected Hours</div>
+                <div class="stat-value">{{ monthly_summary.expected_hours }}h</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Attendance %</div>
+                <div class="stat-value">{{ monthly_summary.attendance_percentage }}%</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Late Minutes</div>
+                <div class="stat-value">{{ monthly_summary.late_minutes }}m</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Missing Hours</div>
+                <div class="stat-value">{{ monthly_summary.missing_hours }}h</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Overtime Hours</div>
+                <div class="stat-value">{{ monthly_summary.overtime_hours }}h</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Holiday Hours</div>
+                <div class="stat-value">{{ monthly_summary.holiday_hours }}h</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Weekend Hours</div>
+                <div class="stat-value">{{ monthly_summary.weekend_hours }}h</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Night Shift Hours</div>
+                <div class="stat-value">{{ monthly_summary.night_hours }}h</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Approved Leave Hours</div>
+                <div class="stat-value">{{ monthly_summary.approved_leave_hours }}h</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Unpaid Leave Hours</div>
+                <div class="stat-value">{{ monthly_summary.unpaid_leave_hours }}h</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Paid Leave Hours</div>
+                <div class="stat-value">{{ monthly_summary.paid_leave_hours }}h</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Present Days</div>
+                <div class="stat-value">{{ monthly_summary.present_days }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Absent Days</div>
+                <div class="stat-value">{{ monthly_summary.absent_days }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Paid Leave Days</div>
+                <div class="stat-value">{{ monthly_summary.paid_leave_days }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Unpaid Leave Days</div>
+                <div class="stat-value">{{ monthly_summary.unpaid_leave_days }}</div>
+            </div>
+        </div>
+
+        <h3 style="margin-top: 24px;">Daily Breakdown</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Worked</th>
+                        <th>Expected</th>
+                        <th>Late</th>
+                        <th>Early Leave</th>
+                        <th>Break</th>
+                        <th>Lunch</th>
+                        <th>OT</th>
+                        <th>Night</th>
+                        <th>Weekend</th>
+                        <th>Holiday</th>
+                        <th>Leave</th>
+                        <th>%</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ds in daily_summaries %}
+                    <tr>
+                        <td>{{ ds.date }}</td>
+                        <td>
+                            {% if ds.on_leave %}
+                            <span class="badge info">Leave: {{ ds.leave_type }}</span>
+                            {% elif ds.is_holiday %}
+                            <span class="badge warning">Holiday{% if ds.worked_minutes > 0 %} (Worked){% endif %}</span>
+                            {% elif ds.is_weekend %}
+                            <span class="badge secondary">Weekend{% if ds.worked_minutes > 0 %} (Worked){% endif %}</span>
+                            {% else %}
+                            <span class="badge {% if ds.worked_minutes == 0 and ds.expected_minutes > 0 %}danger{% elif ds.late_minutes > 0 %}warning{% elif ds.overtime_minutes > 0 %}info{% else %}success{% endif %}">
+                                {% if ds.worked_minutes == 0 and ds.expected_minutes > 0 %}Absent{% elif ds.late_minutes > 0 %}Late{% elif ds.overtime_minutes > 0 %}OT{% else %}Present{% endif %}
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td>{{ ds.worked_minutes }}m</td>
+                        <td>{{ ds.expected_minutes }}m</td>
+                        <td>{{ ds.late_minutes }}m</td>
+                        <td>{{ ds.early_leave_minutes }}m</td>
+                        <td>{{ ds.break_minutes }}m</td>
+                        <td>{{ ds.lunch_minutes }}m</td>
+                        <td>{{ ds.overtime_minutes }}m</td>
+                        <td>{{ ds.night_minutes }}m</td>
+                        <td>{{ ds.weekend_minutes }}m</td>
+                        <td>{{ ds.holiday_minutes }}m</td>
+                        <td>
+                            {% if ds.on_leave %}
+                            {{ ds.leave_type }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td>{{ ds.attendance_percentage }}%</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="14" class="empty">No daily summaries for this month.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

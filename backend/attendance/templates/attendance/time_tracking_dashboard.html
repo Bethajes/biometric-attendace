@@ -1,0 +1,107 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>Time Tracking Dashboard</h2>
+    </div>
+    <div class="panel-body">
+        <div class="info-bar">
+            <div class="info-item">
+                <span class="info-label">Employee</span>
+                <span class="info-value">{{ employee.full_name }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Employee ID</span>
+                <span class="info-value">{{ employee.organization_id }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Department</span>
+                <span class="info-value">{{ employee.department|default:"-" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Job Title</span>
+                <span class="info-value">{{ employee.job_title }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Date</span>
+                <span class="info-value">{{ today }}</span>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card highlight">
+                <div class="stat-label">Today's Worked Hours</div>
+                <div class="stat-value">
+                    {% if today_ds %}
+                    {{ today_ds.worked_minutes|divisibleby:"60"|yesno:"'Xh Ym',today_ds.worked_minutes|add:'m'" }}
+                    {% else %}
+                    0m
+                    {% endif %}
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Weekly Hours</div>
+                <div class="stat-value">{{ weekly_hours }}h</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Monthly Hours</div>
+                <div class="stat-value">{{ monthly_hours }}h</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Expected Hours (Month)</div>
+                <div class="stat-value">{{ monthly_expected }}h</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Attendance %</div>
+                <div class="stat-value">{{ monthly_attendance_pct }}%</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Late Minutes (Month)</div>
+                <div class="stat-value">{{ monthly_late }}m</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Early Leave (Month)</div>
+                <div class="stat-value">{{ monthly_early_leave }}m</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Overtime (Month)</div>
+                <div class="stat-value">{{ monthly_overtime }}h</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Missing Hours (Month)</div>
+                <div class="stat-value">{{ monthly_missing }}h</div>
+            </div>
+        </div>
+
+        {% if today_ds %}
+        <h3 style="margin-top: 24px;">Today's Timeline</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Event Type</th>
+                        <th>Method</th>
+                        <th>Device</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in today_logs %}
+                    <tr>
+                        <td>{{ log.timestamp|time:"H:i" }}</td>
+                        <td>{{ log.get_event_type_display }}</td>
+                        <td>{{ log.get_biometric_method_display }}</td>
+                        <td>{{ log.device.name|default:"-" }}</td>
+                        <td><span class="badge {% if log.verification_status == 'VERIFIED' %}success{% elif log.verification_status == 'FAILED' %}danger{% else %}warning{% endif %}">{{ log.get_verification_status_display }}</span></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="empty">No attendance events today</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,434 @@
+{% extends "attendance/base.html" %}
+{% load humanize static %}
+{% block content %}
+<form class="panel salary-form" method="post" id="salaryForm" novalidate data-preview-url="{% url 'payroll_preview_json' %}">
+    {% csrf_token %}
+    <div class="panel-header">
+        <h2>{{ page_title }}</h2>
+        <div class="row-actions">
+            <a class="button subtle" href="{% url 'payroll_salary_list' %}">Cancel</a>
+            <button class="button primary" type="submit">Save Profile</button>
+        </div>
+    </div>
+    <div class="panel-body">
+        {% if form.non_field_errors %}
+        <div class="messages" style="margin-bottom:16px;">
+            {% for err in form.non_field_errors %}
+            <div class="message error">{{ err }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="salary-form-layout">
+
+            <!-- LEFT COLUMN -->
+            <div class="salary-form-main">
+
+                {# Employee selector #}
+                <div class="salary-card">
+                    <div class="salary-card-header">
+                        <span class="card-icon">&#x1f464;</span>
+                        <h3>Employee</h3>
+                    </div>
+                    <div class="salary-card-body">
+                        <div class="field-group">
+                            <label for="{{ form.employee.id_for_label }}">{{ form.employee.label }}</label>
+                            {{ form.employee }}
+                            {% if form.employee.errors %}<div class="field-error">{{ form.employee.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {# Card: Salary Input #}
+                <div class="salary-card">
+                    <div class="salary-card-header">
+                        <span class="card-icon">&#x1f4b0;</span>
+                        <h3>Salary Input</h3>
+                    </div>
+                    <div class="salary-card-body">
+                        <div class="field-group">
+                            <label>{{ form.payment_type.label }}</label>
+                            <div class="payment-type-selector" id="paymentTypeSelector">
+                                {% for value, label in form.fields.payment_type.choices %}
+                                <label class="pt-option {% if form.payment_type.value == value %}active{% endif %}">
+                                    <input type="radio" name="{{ form.payment_type.html_name }}"
+                                           value="{{ value }}"
+                                           {% if form.payment_type.value == value %}checked{% endif %}
+                                           {% if value == 'MONTHLY' %}data-icon="&#x1f4c5;"{% elif value == 'HOURLY' %}data-icon="&#x23f1;"{% else %}data-icon="&#x1f4c6;"{% endif %}>
+                                    <span>{{ label }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        {# Source salary input #}
+                        <div class="source-salary-section">
+                            <div class="source-field" data-payment-type="MONTHLY"
+                                 {% if form.payment_type.value != 'MONTHLY' %}style="display:none"{% endif %}>
+                                <label for="{{ form.monthly_salary.id_for_label }}">
+                                    Monthly Salary
+                                    <span class="field-tip" title="The employee's fixed monthly pay before allowances and deductions.">&#x24d8;</span>
+                                </label>
+                                <div class="input-with-currency">
+                                    <span class="currency-badge">ETB</span>
+                                    {{ form.monthly_salary }}
+                                </div>
+                                {% if form.monthly_salary.errors %}<div class="field-error">{{ form.monthly_salary.errors }}</div>{% endif %}
+                            </div>
+                            <div class="source-field" data-payment-type="HOURLY"
+                                 {% if form.payment_type.value != 'HOURLY' %}style="display:none"{% endif %}>
+                                <label for="{{ form.hourly_rate.id_for_label }}">
+                                    Hourly Rate
+                                </label>
+                                <div class="input-with-currency">
+                                    <span class="currency-badge">ETB</span>
+                                    {{ form.hourly_rate }}
+                                </div>
+                                {% if form.hourly_rate.errors %}<div class="field-error">{{ form.hourly_rate.errors }}</div>{% endif %}
+                            </div>
+                            <div class="source-field" data-payment-type="DAILY"
+                                 {% if form.payment_type.value != 'DAILY' %}style="display:none"{% endif %}>
+                                <label for="{{ form.daily_rate.id_for_label }}">Daily Rate</label>
+                                <div class="input-with-currency">
+                                    <span class="currency-badge">ETB</span>
+                                    {{ form.daily_rate }}
+                                </div>
+                                {% if form.daily_rate.errors %}<div class="field-error">{{ form.daily_rate.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        <div class="computed-grid" id="computedRates">
+                            <div class="computed-field">
+                                <label>Hourly Rate</label>
+                                <div class="readonly-value" id="displayHourlyRate">—</div>
+                            </div>
+                            <div class="computed-field">
+                                <label>Daily Rate</label>
+                                <div class="readonly-value" id="displayDailyRate">—</div>
+                            </div>
+                            <div class="computed-field">
+                                <label>Weekly Salary</label>
+                                <div class="readonly-value" id="displayWeeklySalary">—</div>
+                            </div>
+                            <div class="computed-field">
+                                <label>Monthly Hours</label>
+                                <div class="readonly-value" id="displayMonthlyHours">—</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {# Card: Work Schedule #}
+                <div class="salary-card">
+                    <div class="salary-card-header">
+                        <span class="card-icon">&#x1f552;</span>
+                        <h3>Work Schedule</h3>
+                    </div>
+                    <div class="salary-card-body">
+                        <div class="schedule-grid">
+                            <div class="field-group">
+                                <label for="{{ form.days_per_week.id_for_label }}">Days Per Week</label>
+                                {{ form.days_per_week }}
+                                {% if form.days_per_week.errors %}<div class="field-error">{{ form.days_per_week.errors }}</div>{% endif %}
+                            </div>
+                            <div class="field-group">
+                                <label for="{{ form.expected_daily_hours.id_for_label }}">Hours Per Day</label>
+                                {{ form.expected_daily_hours }}
+                                {% if form.expected_daily_hours.errors %}<div class="field-error">{{ form.expected_daily_hours.errors }}</div>{% endif %}
+                            </div>
+                            <div class="field-group">
+                                <label for="{{ form.break_duration.id_for_label }}">Break (minutes)</label>
+                                {{ form.break_duration }}
+                                {% if form.break_duration.errors %}<div class="field-error">{{ form.break_duration.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+                        <div class="computed-grid" id="computedHours" style="margin-top:14px;">
+                            <div class="computed-field">
+                                <label>Weekly Hours</label>
+                                <div class="readonly-value" id="displayWeeklyHours">—</div>
+                            </div>
+                            <div class="computed-field">
+                                <label>Monthly Hours</label>
+                                <div class="readonly-value" id="displayMonthlyHours2">—</div>
+                            </div>
+                            <div class="computed-field">
+                                <label>Annual Hours</label>
+                                <div class="readonly-value" id="displayAnnualHours">—</div>
+                            </div>
+                            <div class="computed-field">
+                                <label>Eff. Hours/Day</label>
+                                <div class="readonly-value" id="displayEffectiveDaily">—</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:none">
+                    {{ form.expected_weekly_hours }}
+                    {{ form.expected_monthly_hours }}
+                    {{ form.hourly_rate }}
+                    {{ form.daily_rate }}
+                </div>
+
+            </div>
+
+            <!-- RIGHT COLUMN -->
+            <div class="salary-form-sidebar">
+
+                {# Card: Salary Summary #}
+                <div class="salary-card salary-summary-card" id="salarySummary">
+                    <div class="salary-card-header">
+                        <span class="card-icon">&#x1f4ca;</span>
+                        <h3>Salary Summary</h3>
+                    </div>
+                    <div class="salary-card-body">
+                        <div class="summary-row">
+                            <span class="summary-label">Monthly Salary</span>
+                            <span class="summary-value" id="summaryMonthly">—</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="summary-label">Daily Rate</span>
+                            <span class="summary-value" id="summaryDaily">—</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="summary-label">Hourly Rate</span>
+                            <span class="summary-value" id="summaryHourly">—</span>
+                        </div>
+                        <div class="summary-divider"></div>
+                        <div class="summary-row">
+                            <span class="summary-label">Days / Week</span>
+                            <span class="summary-value" id="summaryDays">—</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="summary-label">Hours / Day</span>
+                            <span class="summary-value" id="summaryHoursPerDay">—</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="summary-label">Weekly Hours</span>
+                            <span class="summary-value" id="summaryWeeklyHours">—</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="summary-label">Monthly Hours</span>
+                            <span class="summary-value" id="summaryMonthlyHours">—</span>
+                        </div>
+                        <div class="summary-divider"></div>
+                        <div class="summary-row">
+                            <span class="summary-label">Cost / Hour</span>
+                            <span class="summary-value" id="summaryCostPerHour">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                {# Card: Payroll Preview #}
+                <div class="salary-card payroll-preview-card" id="payrollPreview">
+                    <div class="salary-card-header">
+                        <span class="card-icon">&#x1f4cb;</span>
+                        <h3>Payroll Preview</h3>
+                        <span id="previewLoader" style="display:none;margin-left:auto;font-size:0.8rem;color:#888;">calculating...</span>
+                    </div>
+                    <div class="salary-card-body">
+                        <div class="preview-section">
+                            <div class="preview-section-title">Attendance</div>
+                            <div class="preview-row">
+                                <span>Worked Hours</span>
+                                <input type="number" id="previewWorkedHours" value="0" step="0.5" min="0" max="744" class="preview-input">
+                            </div>
+                            <div class="preview-row">
+                                <span>Expected Hours</span>
+                                <span class="pv-val" id="previewExpectedHours">—</span>
+                            </div>
+                            <div class="preview-row">
+                                <span>Missing Hours</span>
+                                <span class="pv-val pv-warn" id="previewMissingHours">0</span>
+                            </div>
+                            <div class="preview-row">
+                                <span>Attendance %</span>
+                                <span class="pv-val" id="previewAttendancePct">—</span>
+                            </div>
+                        </div>
+
+                        <div class="preview-section">
+                            <div class="preview-section-title">Salary Breakdown</div>
+                            <div class="preview-row">
+                                <span>Basic Salary</span>
+                                <span class="pv-val" id="previewBasicSalary">—</span>
+                            </div>
+                            <div class="preview-row">
+                                <span>Attendance Salary</span>
+                                <span class="pv-val" id="previewAttendanceSalary">—</span>
+                            </div>
+                            <div class="preview-row">
+                                <span>Hourly Rate</span>
+                                <span class="pv-val" id="previewHourlyRate">—</span>
+                            </div>
+                            <div class="preview-row">
+                                <span>Daily Rate</span>
+                                <span class="pv-val" id="previewDailyRate">—</span>
+                            </div>
+                            <div class="preview-row">
+                                <span>Overtime Pay</span>
+                                <span class="pv-val" id="previewOvertimePay">—</span>
+                            </div>
+                            <div class="preview-row">
+                                <span>Total Allowances</span>
+                                <span class="pv-val" id="previewAllowances">—</span>
+                            </div>
+                            <div class="preview-row">
+                                <span>Total Bonuses</span>
+                                <span class="pv-val" id="previewBonuses">—</span>
+                            </div>
+                            <div class="preview-row pv-total">
+                                <span>Gross Salary</span>
+                                <span class="pv-val pv-highlight" id="previewGross">—</span>
+                            </div>
+                        </div>
+
+                        <div class="preview-section">
+                            <div class="preview-section-title">Deductions</div>
+                            <div class="preview-row">
+                                <span>Income Tax</span>
+                                <span class="pv-val pv-danger" id="previewIncomeTax">—</span>
+                            </div>
+                            <div class="preview-row">
+                                <span>Pension (Employee)</span>
+                                <span class="pv-val pv-danger" id="previewPension">—</span>
+                            </div>
+                            <div class="preview-row">
+                                <span>Government Deductions</span>
+                                <span class="pv-val pv-danger" id="previewGovernmentDed">—</span>
+                            </div>
+                            <div class="preview-row">
+                                <span>Company Deductions</span>
+                                <span class="pv-val pv-danger" id="previewCompanyDed">—</span>
+                            </div>
+                            <div class="preview-row pv-total">
+                                <span>Net Salary</span>
+                                <span class="pv-val pv-net" id="previewNet">—</span>
+                            </div>
+                        </div>
+
+                        <div id="previewError" style="display:none;color:#d32f2f;font-size:0.85rem;margin-top:8px;text-align:center;"></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        {# Card: Advanced Settings #}
+        <div class="salary-card advanced-card" id="advancedSettings">
+            <div class="salary-card-header collapsible-header" id="advancedToggle" role="button" tabindex="0">
+                <span class="card-icon">&#x2699;</span>
+                <h3>Advanced Settings</h3>
+                <span class="collapse-icon" id="collapseIcon">&#x25bc;</span>
+            </div>
+            <div class="salary-card-body advanced-body" id="advancedBody">
+                <div class="advanced-grid">
+                    <div class="field-group">
+                        <label>{{ form.payment_method.label }}</label>
+                        {{ form.payment_method }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.tax_category.label }}</label>
+                        {{ form.tax_category }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.pension_eligible.label }}</label>
+                        {{ form.pension_eligible }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.overtime_eligible.label }}</label>
+                        {{ form.overtime_eligible }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.attendance_deduction_policy.label }}</label>
+                        {{ form.attendance_deduction_policy }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.bonus_eligible.label }}</label>
+                        {{ form.bonus_eligible }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.transport_allowance.label }}</label>
+                        {{ form.transport_allowance }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.housing_allowance.label }}</label>
+                        {{ form.housing_allowance }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.communication_allowance.label }}</label>
+                        {{ form.communication_allowance }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.meal_allowance.label }}</label>
+                        {{ form.meal_allowance }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.other_allowances.label }}</label>
+                        {{ form.other_allowances }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.bank_name.label }}</label>
+                        {{ form.bank_name }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.bank_account_number.label }}</label>
+                        {{ form.bank_account_number }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.bank_branch.label }}</label>
+                        {{ form.bank_branch }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.mobile_money_number.label }}</label>
+                        {{ form.mobile_money_number }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.currency.label }}</label>
+                        {{ form.currency }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.tax_rule_set.label }}</label>
+                        {{ form.tax_rule_set }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.overtime_rule_set.label }}</label>
+                        {{ form.overtime_rule_set }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.apply_attendance_deductions.label }}</label>
+                        {{ form.apply_attendance_deductions }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.effective_from.label }}</label>
+                        {{ form.effective_from }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.effective_to.label }}</label>
+                        {{ form.effective_to }}
+                    </div>
+                    <div class="field-group">
+                        <label>{{ form.is_active.label }}</label>
+                        {{ form.is_active }}
+                    </div>
+                    <div class="field-group full-width">
+                        <label>{{ form.notes.label }}</label>
+                        {{ form.notes }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'attendance/js/salary-calculator.js' %}"></script>
+<script>
+(function() {
+    var calculator = new SalaryCalculator('salaryForm');
+    calculator.init();
+})();
+</script>
+{% endblock %}

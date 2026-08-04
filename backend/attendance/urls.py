@@ -63,6 +63,12 @@ urlpatterns = [
     path('api/enrollment/<int:request_id>/complete/', views.enrollment_complete_api, name='enrollment_complete_api'),
     path('api/enrollment/<int:request_id>/fail/', views.enrollment_fail_api, name='enrollment_fail_api'),
 
+    # Time Tracking
+    path('time-tracking/', views.TimeTrackingDashboardView.as_view(), name='time_tracking_dashboard'),
+    path('time-tracking/employee/<int:pk>/', views.TimeTrackingEmployeeDetailView.as_view(), name='time_tracking_detail'),
+    path('time-tracking/employee/<int:pk>/<int:year>/<int:month>/', views.TimeTrackingMonthlySummaryView.as_view(), name='time_tracking_monthly'),
+    path('time-tracking/employee/<int:pk>/audit/', views.TimeTrackingAuditTrailView.as_view(), name='time_tracking_audit'),
+
     path('login/', views.SmartLoginView.as_view(), name='login'),
     path('logout/', views.SmartLogoutView.as_view(), name='logout'),
 ]

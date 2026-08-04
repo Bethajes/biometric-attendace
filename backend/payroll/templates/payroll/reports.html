@@ -1,0 +1,83 @@
+{% extends "attendance/base.html" %}
+{% load humanize %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header"><h2>Payroll Reports</h2></div>
+    <div class="panel-body">
+        <form class="filter-bar" method="get">
+            <label>Period
+                <select name="period" onchange="this.form.submit()">
+                    {% for p in periods %}
+                        <option value="{{ p.id }}" {% if selected_period and selected_period.id == p.id %}selected{% endif %}>{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </form>
+
+        {% if selected_period %}
+        <section class="metrics">
+            <article class="metric-card"><div class="metric-label">Gross</div><div class="metric-value">{{ totals.gross|default:0|floatformat:0|intcomma }}</div></article>
+            <article class="metric-card"><div class="metric-label">Net</div><div class="metric-value">{{ totals.net|default:0|floatformat:0|intcomma }}</div></article>
+            <article class="metric-card"><div class="metric-label">Income Tax</div><div class="metric-value">{{ totals.tax|default:0|floatformat:0|intcomma }}</div></article>
+            <article class="metric-card"><div class="metric-label">Pension Emp / Er</div><div class="metric-value" style="font-size:1.1rem;">{{ totals.pension|default:0|floatformat:0|intcomma }} / {{ totals.employer_pension|default:0|floatformat:0|intcomma }}</div></article>
+        </section>
+
+        <h3 style="margin-top:20px;">Department Payroll</h3>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Department</th><th>Headcount</th><th>Gross</th><th>Net</th><th>Tax</th><th>Pension</th><th>OT</th></tr></thead>
+                <tbody>
+                {% for row in by_department %}
+                    <tr>
+                        <td>{{ row.employee__department__name|default:"Unassigned" }}</td>
+                        <td>{{ row.headcount }}</td>
+                        <td>{{ row.gross|floatformat:2|intcomma }}</td>
+                        <td>{{ row.net|floatformat:2|intcomma }}</td>
+                        <td>{{ row.tax|floatformat:2|intcomma }}</td>
+                        <td>{{ row.pension|floatformat:2|intcomma }}</td>
+                        <td>{{ row.overtime|floatformat:2|intcomma }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7" class="empty">No data for this period.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <h3 style="margin-top:20px;">Attendance vs Payroll</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Employee</th><th>Expected</th><th>Worked</th><th>Missing</th><th>OT Hours</th><th>Attendance Deduction</th><th>Net</th></tr>
+                </thead>
+                <tbody>
+                {% for row in payrolls %}
+                    <tr>
+                        <td>{{ row.employee.full_name }}</td>
+                        <td>{{ row.expected_hours }}</td>
+                        <td>{{ row.worked_hours }}</td>
+                        <td>{{ row.missing_hours }}</td>
+                        <td>{{ row.overtime_hours }}</td>
+                        <td>{{ row.attendance_deductions|floatformat:2|intcomma }}</td>
+                        <td>{{ row.net_salary|floatformat:2|intcomma }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7" class="empty">No payroll rows.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <p class="muted" style="margin-top:16px;">
+            Additional exports: use CSV/Excel/PDF on the
+            <a href="{% url 'payroll_list' %}?period={{ selected_period.id }}">payroll list</a>,
+            <a href="{% url 'payroll_bonus_list' %}">bonus</a>, and
+            <a href="{% url 'payroll_deduction_list' %}">deduction</a> screens.
+            Tax &amp; pension configuration is editable in Admin → Tax Rule Sets.
+        </p>
+        {% else %}
+            <p class="empty">Create a payroll period to view reports.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

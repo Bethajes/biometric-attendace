@@ -1,0 +1,41 @@
+{% extends "attendance/base.html" %}
+{% load humanize %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>{{ object.employee.full_name }}</h2>
+        <div class="row-actions">
+            <a class="button subtle" href="{% url 'payroll_salary_list' %}">Back</a>
+            <a class="button primary" href="{% url 'payroll_salary_edit' object.pk %}">Edit</a>
+        </div>
+    </div>
+    <div class="panel-body">
+        <div class="metrics" style="margin-bottom:16px;">
+            <article class="metric-card"><div class="metric-label">Basic</div><div class="metric-value">{{ object.currency }} {{ object.basic_salary|floatformat:2|intcomma }}</div></article>
+            <article class="metric-card"><div class="metric-label">Gross</div><div class="metric-value">{{ object.currency }} {{ object.gross_salary|floatformat:2|intcomma }}</div></article>
+            <article class="metric-card"><div class="metric-label">Payment</div><div class="metric-value" style="font-size:1.2rem;">{{ object.get_payment_type_display }}</div></article>
+            <article class="metric-card"><div class="metric-label">Expected Hours</div><div class="metric-value">{{ object.expected_monthly_hours }}</div><div class="metric-note">{{ object.expected_daily_hours }}h/day · {{ object.expected_weekly_hours }}h/week</div></article>
+        </div>
+        <div class="grid-2">
+            <div>
+                <h3>Allowances</h3>
+                <p>Transport: {{ object.transport_allowance }}</p>
+                <p>Housing: {{ object.housing_allowance }}</p>
+                <p>Communication: {{ object.communication_allowance }}</p>
+                <p>Meal: {{ object.meal_allowance }}</p>
+                <p>Other: {{ object.other_allowances }}</p>
+            </div>
+            <div>
+                <h3>Bank &amp; Rules</h3>
+                <p>Bank: {{ object.bank_name|default:"—" }} {{ object.bank_account_number }}</p>
+                <p>Method: {{ object.get_payment_method_display }}</p>
+                <p>Tax category: {{ object.get_tax_category_display }}</p>
+                <p>Tax rules: {{ object.tax_rule_set|default:"Default" }}</p>
+                <p>OT rules: {{ object.overtime_rule_set|default:"Default" }}</p>
+                <p>Bonus / OT / Pension: {% if object.bonus_eligible %}Bonus{% endif %} {% if object.overtime_eligible %}OT{% endif %} {% if object.pension_eligible %}Pension{% endif %}</p>
+            </div>
+        </div>
+        {% if object.notes %}<p class="muted" style="margin-top:12px;">{{ object.notes }}</p>{% endif %}
+    </div>
+</div>
+{% endblock %}

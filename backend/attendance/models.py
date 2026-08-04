@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -346,6 +347,32 @@ class LeaveBalance(models.Model):
 
 
 class AttendanceLog(models.Model):
+    class EventType(models.TextChoices):
+        CHECK_IN = 'CHECK_IN', 'Check In'
+        CHECK_OUT = 'CHECK_OUT', 'Check Out'
+        BREAK_START = 'BREAK_START', 'Break Start'
+        BREAK_END = 'BREAK_END', 'Break End'
+        LUNCH_START = 'LUNCH_START', 'Lunch Start'
+        LUNCH_END = 'LUNCH_END', 'Lunch End'
+        REMOTE_LOGIN = 'REMOTE_LOGIN', 'Remote Login'
+        REMOTE_LOGOUT = 'REMOTE_LOGOUT', 'Remote Logout'
+        SITE_VISIT = 'SITE_VISIT', 'Site Visit'
+
+    class BiometricMethod(models.TextChoices):
+        FINGERPRINT = 'FINGERPRINT', 'Fingerprint'
+        FACE = 'FACE', 'Face Recognition'
+        IRIS = 'IRIS', 'Iris Scan'
+        CARD = 'CARD', 'RFID Card'
+        PIN = 'PIN', 'PIN Code'
+        MOBILE = 'MOBILE', 'Mobile App'
+        MANUAL = 'MANUAL', 'Manual Entry'
+
+    class VerificationStatus(models.TextChoices):
+        VERIFIED = 'VERIFIED', 'Verified'
+        FAILED = 'FAILED', 'Failed'
+        PENDING = 'PENDING', 'Pending Verification'
+        BYPASSED = 'BYPASSED', 'Bypassed'
+
     class ScanSource(models.TextChoices):
         BIOMETRIC = 'BIOMETRIC', 'Biometric Device'
         MANUAL = 'MANUAL', 'Manual Entry'
@@ -355,7 +382,22 @@ class AttendanceLog(models.Model):
 
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(auto_now_add=True)
-    scan_type = models.CharField(max_length=10, choices=[('IN', 'Check-In'), ('OUT', 'Check-Out')], default='IN')
+
+    event_type = models.CharField(
+        max_length=20, choices=EventType.choices, default=EventType.CHECK_IN, db_index=True
+    )
+    scan_type = models.CharField(
+        max_length=10, choices=[('IN', 'Check-In'), ('OUT', 'Check-Out')], default='IN'
+    )
+
+    biometric_method = models.CharField(
+        max_length=20, choices=BiometricMethod.choices, default=BiometricMethod.FINGERPRINT
+    )
+    verification_status = models.CharField(
+        max_length=20, choices=VerificationStatus.choices, default=VerificationStatus.VERIFIED
+    )
+    fingerprint_id = models.PositiveIntegerField(null=True, blank=True)
+
     device = models.ForeignKey('BiometricDevice', on_delete=models.SET_NULL, null=True, blank=True)
     source = models.CharField(max_length=20, choices=ScanSource.choices, default=ScanSource.BIOMETRIC, db_index=True)
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
@@ -363,11 +405,17 @@ class AttendanceLog(models.Model):
     is_within_geofence = models.BooleanField(null=True, blank=True)
 
     class Meta:
-        verbose_name = 'Attendance Log'
-        verbose_name_plural = 'Attendance Logs'
+        verbose_name = 'Attendance Event'
+        verbose_name_plural = 'Attendance Events'
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['employee', 'event_type']),
+            models.Index(fields=['employee', 'timestamp']),
+            models.Index(fields=['event_type', 'timestamp']),
+        ]
 
     def __str__(self):
-        return f"{self.employee.first_name} - {self.scan_type} at {self.timestamp.strftime('%H:%M')}"
+        return f"{self.employee.first_name} - {self.get_event_type_display()} at {self.timestamp.strftime('%H:%M')}"
 
 
 class AttendanceRecord(models.Model):
@@ -416,6 +464,96 @@ class AttendanceRecord(models.Model):
 
     def __str__(self):
         return f'{self.employee.full_name} - {self.date} - {self.get_status_display()}'
+
+
+class DailyTimeSummary(models.Model):
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='daily_time_summaries')
+    date = models.DateField(db_index=True)
+    attendance_record = models.OneToOneField(
+        'AttendanceRecord', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='time_summary',
+    )
+
+    worked_minutes = models.PositiveIntegerField(default=0)
+    expected_minutes = models.PositiveIntegerField(default=0)
+    attendance_percentage = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('0.00'))
+
+    late_minutes = models.PositiveIntegerField(default=0)
+    early_leave_minutes = models.PositiveIntegerField(default=0)
+    break_minutes = models.PositiveIntegerField(default=0)
+    lunch_minutes = models.PositiveIntegerField(default=0)
+    missing_minutes = models.PositiveIntegerField(default=0)
+    overtime_minutes = models.PositiveIntegerField(default=0)
+    night_minutes = models.PositiveIntegerField(default=0)
+    weekend_minutes = models.PositiveIntegerField(default=0)
+    holiday_minutes = models.PositiveIntegerField(default=0)
+
+    is_weekend = models.BooleanField(default=False)
+    is_holiday = models.BooleanField(default=False)
+    is_night_shift = models.BooleanField(default=False)
+    on_leave = models.BooleanField(default=False)
+    leave_type = models.CharField(max_length=20, blank=True)
+    leave_is_paid = models.BooleanField(default=True)
+
+    calculated_at = models.DateTimeField(auto_now=True)
+    recalculation_count = models.PositiveIntegerField(default=0)
+    last_recalculated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = [('employee', 'date')]
+        ordering = ['-date', 'employee__first_name']
+        verbose_name = 'Daily Time Summary'
+        verbose_name_plural = 'Daily Time Summaries'
+        indexes = [
+            models.Index(fields=['date']),
+            models.Index(fields=['employee', 'date']),
+        ]
+
+    def __str__(self):
+        return f'{self.employee.full_name} - {self.date} - {self.worked_minutes}min worked'
+
+
+class MonthlyTimeSummary(models.Model):
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='monthly_time_summaries')
+    year = models.PositiveIntegerField(db_index=True)
+    month = models.PositiveIntegerField(db_index=True)
+
+    expected_hours = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal('0.00'))
+    worked_hours = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal('0.00'))
+    attendance_percentage = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('0.00'))
+
+    late_minutes = models.PositiveIntegerField(default=0)
+    missing_hours = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal('0.00'))
+    overtime_hours = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal('0.00'))
+    holiday_hours = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal('0.00'))
+    weekend_hours = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal('0.00'))
+    night_hours = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal('0.00'))
+
+    approved_leave_hours = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal('0.00'))
+    unpaid_leave_hours = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal('0.00'))
+    paid_leave_hours = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal('0.00'))
+
+    present_days = models.PositiveIntegerField(default=0)
+    absent_days = models.PositiveIntegerField(default=0)
+    paid_leave_days = models.PositiveIntegerField(default=0)
+    unpaid_leave_days = models.PositiveIntegerField(default=0)
+
+    calculated_at = models.DateTimeField(auto_now=True)
+    recalculation_count = models.PositiveIntegerField(default=0)
+    last_recalculated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = [('employee', 'year', 'month')]
+        ordering = ['-year', '-month', 'employee__first_name']
+        verbose_name = 'Monthly Time Summary'
+        verbose_name_plural = 'Monthly Time Summaries'
+        indexes = [
+            models.Index(fields=['year', 'month']),
+            models.Index(fields=['employee', 'year', 'month']),
+        ]
+
+    def __str__(self):
+        return f'{self.employee.full_name} - {self.year}-{self.month:02d} - {self.worked_hours}h worked'
 
 
 class AttendanceBreak(models.Model):

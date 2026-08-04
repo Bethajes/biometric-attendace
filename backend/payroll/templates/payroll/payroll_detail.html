@@ -1,0 +1,93 @@
+{% extends "attendance/base.html" %}
+{% load humanize %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>{{ object.employee.full_name }} — {{ object.period }}</h2>
+        <div class="row-actions">
+            <a class="button subtle" href="{% url 'payroll_period_detail' object.period_id %}">Period</a>
+            {% if object.payslip %}
+                <a class="button primary" href="{% url 'payroll_payslip' object.payslip.pk %}">Payslip</a>
+            {% endif %}
+            <span class="badge">{{ object.get_status_display }}</span>
+        </div>
+    </div>
+    <div class="panel-body">
+        <section class="metrics">
+            <article class="metric-card"><div class="metric-label">Gross</div><div class="metric-value">{{ object.currency }} {{ object.gross_salary|floatformat:2|intcomma }}</div></article>
+            <article class="metric-card"><div class="metric-label">Net</div><div class="metric-value">{{ object.currency }} {{ object.net_salary|floatformat:2|intcomma }}</div></article>
+            <article class="metric-card"><div class="metric-label">Tax</div><div class="metric-value">{{ object.income_tax|floatformat:2|intcomma }}</div></article>
+            <article class="metric-card"><div class="metric-label">Hours</div><div class="metric-value">{{ object.worked_hours }}</div><div class="metric-note">Expected {{ object.expected_hours }} · Missing {{ object.missing_hours }} · OT {{ object.overtime_hours }}</div></article>
+        </section>
+
+        <div class="grid-2" style="margin-top:16px;">
+            <div class="panel">
+                <div class="panel-header"><h3>Earnings</h3></div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Description</th><th>Qty</th><th>Amount</th></tr></thead>
+                        <tbody>
+                        {% for item in earnings %}
+                            <tr><td>{{ item.description }}</td><td>{{ item.quantity }}</td><td>{{ item.amount|floatformat:2|intcomma }}</td></tr>
+                        {% empty %}
+                            <tr><td colspan="3" class="empty">No earnings</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><h3>Deductions</h3></div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Description</th><th>Amount</th></tr></thead>
+                        <tbody>
+                        {% for item in deductions %}
+                            <tr><td>{{ item.description }}</td><td>{{ item.amount|floatformat:2|intcomma }}</td></tr>
+                        {% empty %}
+                            <tr><td colspan="2" class="empty">No deductions</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-2" style="margin-top:16px;">
+            <div>
+                <h3>Attendance Summary</h3>
+                <p>Present days: {{ object.present_days }}</p>
+                <p>Absent days: {{ object.absent_days }}</p>
+                <p>Paid leave: {{ object.paid_leave_days }} · Unpaid leave: {{ object.unpaid_leave_days }}</p>
+                <p>Holidays: {{ object.holiday_days }}</p>
+                <p>Late minutes: {{ object.late_minutes }} · Early leave: {{ object.early_leave_minutes }}</p>
+                <p>Pension (employee): {{ object.pension_employee }} · Employer: {{ object.pension_employer }}</p>
+            </div>
+            <form method="post" action="{% url 'payroll_action' object.pk %}" class="panel">
+                {% csrf_token %}
+                <div class="panel-header"><h3>Approval Actions</h3></div>
+                <div class="panel-body form-grid">
+                    {{ approval_form.as_p }}
+                    <div class="row-actions" style="flex-wrap:wrap;gap:8px;">
+                        <button class="button" name="action" value="submit" type="submit">Submit HR</button>
+                        <button class="button" name="action" value="hr_approve" type="submit">HR Approve</button>
+                        <button class="button" name="action" value="finance_approve" type="submit">Finance Approve</button>
+                        <button class="button primary" name="action" value="lock" type="submit">Lock + Payslip</button>
+                        <button class="button" name="action" value="pay" type="submit">Mark Paid</button>
+                        <button class="button subtle" name="action" value="reject" type="submit">Reject</button>
+                        <button class="button subtle" name="action" value="unlock" type="submit">Unlock</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        {% if employer_items %}
+        <div style="margin-top:16px;">
+            <h3>Employer Contributions</h3>
+            <ul>{% for item in employer_items %}<li>{{ item.description }}: {{ item.amount|floatformat:2|intcomma }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+        {% if object.calculation_notes %}<p class="muted" style="margin-top:12px;">{{ object.calculation_notes }}</p>{% endif %}
+    </div>
+</div>
+{% endblock %}

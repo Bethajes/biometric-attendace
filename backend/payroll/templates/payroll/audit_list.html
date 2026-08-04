@@ -1,0 +1,31 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header"><h2>Payroll Audit Log</h2></div>
+    <div class="panel-body">
+        <form class="filter-bar" method="get">
+            <label>Search<input name="q" value="{{ request.GET.q }}" placeholder="Summary, actor, entity"></label>
+            <button class="button primary" type="submit">Apply</button>
+        </form>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>When</th><th>Action</th><th>Summary</th><th>Actor</th><th>Entity</th></tr></thead>
+            <tbody>
+            {% for row in object_list %}
+                <tr>
+                    <td>{{ row.created_at|date:"Y-m-d H:i" }}</td>
+                    <td><span class="badge">{{ row.get_action_display }}</span></td>
+                    <td>{{ row.summary }}</td>
+                    <td>{{ row.actor|default:"System" }}</td>
+                    <td>{{ row.entity_type }} {% if row.entity_id %}#{{ row.entity_id }}{% endif %}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="empty">No audit entries.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "attendance/_pagination.html" %}
+</div>
+{% endblock %}

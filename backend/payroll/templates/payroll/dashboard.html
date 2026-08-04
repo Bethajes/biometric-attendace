@@ -1,0 +1,103 @@
+{% extends "attendance/base.html" %}
+{% load humanize %}
+
+{% block content %}
+<section class="metrics">
+    <article class="metric-card">
+        <div class="metric-label">Employees Ready</div>
+        <div class="metric-value">{{ profiles_ready }}</div>
+        <div class="metric-note">{{ employees_missing_profile }} missing salary profile</div>
+    </article>
+    <article class="metric-card">
+        <div class="metric-label">Pending Payroll</div>
+        <div class="metric-value">{{ pending_count }}</div>
+        <div class="metric-note">Draft / HR / Finance review</div>
+    </article>
+    <article class="metric-card">
+        <div class="metric-label">Monthly Payroll Cost</div>
+        <div class="metric-value">{{ monthly_cost|floatformat:0|intcomma }}</div>
+        <div class="metric-note">Net pay {{ today|date:"F Y" }}</div>
+    </article>
+    <article class="metric-card">
+        <div class="metric-label">Total Overtime Cost</div>
+        <div class="metric-value">{{ overtime_cost|floatformat:0|intcomma }}</div>
+        <div class="metric-note">Bonuses {{ bonus_total|floatformat:0|intcomma }} · Deductions {{ deduction_total|floatformat:0|intcomma }}</div>
+    </article>
+</section>
+
+<section class="grid-2">
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Payroll Periods</h2>
+            <div class="row-actions">
+                <a class="button subtle" href="{% url 'payroll_period_list' %}">All periods</a>
+                <a class="button primary" href="{% url 'payroll_period_add' %}">New Period</a>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Period</th><th>Dates</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                {% for period in periods %}
+                    <tr>
+                        <td><strong>{{ period.name }}</strong></td>
+                        <td class="muted">{{ period.start_date }} – {{ period.end_date }}</td>
+                        <td><span class="badge">{{ period.get_status_display }}</span></td>
+                        <td class="row-actions"><a class="button subtle" href="{% url 'payroll_period_detail' period.pk %}">Open</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="4" class="empty">No payroll periods yet. Create one to start processing.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <aside class="panel">
+        <div class="panel-header"><h2>Quick Links</h2></div>
+        <div class="panel-body" style="display:grid;gap:10px;">
+            <a class="button" href="{% url 'payroll_salary_list' %}">Salary Profiles</a>
+            <a class="button" href="{% url 'payroll_list' %}">Employee Payroll</a>
+            <a class="button" href="{% url 'payroll_bonus_list' %}">Bonuses</a>
+            <a class="button" href="{% url 'payroll_deduction_list' %}">Deductions</a>
+            <a class="button" href="{% url 'payroll_allowance_list' %}">Allowances</a>
+            <a class="button" href="{% url 'payroll_reports' %}">Reports</a>
+            <a class="button" href="{% url 'payroll_audit' %}">Audit Log</a>
+            <a class="button subtle" href="/admin/payroll/taxruleset/">Tax Configuration</a>
+        </div>
+        <div class="panel-header"><h2>This Month by Status</h2></div>
+        <div class="panel-body">
+            {% for row in status_breakdown %}
+                <p style="display:flex;justify-content:space-between;margin-bottom:10px;">
+                    <span>{{ row.status }}</span><strong>{{ row.total }}</strong>
+                </p>
+            {% empty %}
+                <p class="muted">No payroll calculated this month.</p>
+            {% endfor %}
+        </div>
+    </aside>
+</section>
+
+<section class="panel" style="margin-top:16px;">
+    <div class="panel-header"><h2>Recent Payroll</h2><a class="button subtle" href="{% url 'payroll_list' %}">View all</a></div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Employee</th><th>Period</th><th>Gross</th><th>Net</th><th>Hours</th><th>Status</th></tr></thead>
+            <tbody>
+            {% for row in recent_payrolls %}
+                <tr>
+                    <td><a href="{% url 'payroll_detail' row.pk %}">{{ row.employee.full_name }}</a></td>
+                    <td>{{ row.period }}</td>
+                    <td>{{ row.currency }} {{ row.gross_salary|floatformat:2|intcomma }}</td>
+                    <td><strong>{{ row.currency }} {{ row.net_salary|floatformat:2|intcomma }}</strong></td>
+                    <td>{{ row.worked_hours }}/{{ row.expected_hours }}</td>
+                    <td><span class="badge">{{ row.get_status_display }}</span></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="empty">No payroll records yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends "attendance/base.html" %}
+{% load humanize %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>{{ object.name }}</h2>
+        <div class="row-actions">
+            <a class="button subtle" href="{% url 'payroll_period_list' %}">Back</a>
+            <span class="badge">{{ object.get_status_display }}</span>
+        </div>
+    </div>
+    <div class="panel-body">
+        <p class="muted">{{ object.start_date }} – {{ object.end_date }} · Payment date {{ object.payment_date|default:"TBD" }}</p>
+        <section class="metrics">
+            <article class="metric-card"><div class="metric-label">Gross</div><div class="metric-value">{{ totals.gross|floatformat:0|intcomma }}</div></article>
+            <article class="metric-card"><div class="metric-label">Net</div><div class="metric-value">{{ totals.net|floatformat:0|intcomma }}</div></article>
+            <article class="metric-card"><div class="metric-label">Tax</div><div class="metric-value">{{ totals.tax|floatformat:0|intcomma }}</div></article>
+            <article class="metric-card"><div class="metric-label">Overtime</div><div class="metric-value">{{ totals.ot|floatformat:0|intcomma }}</div></article>
+        </section>
+
+        <div class="grid-2" style="margin-top:16px;">
+            <form method="post" action="{% url 'payroll_period_process' object.pk %}" class="panel">
+                {% csrf_token %}
+                <div class="panel-header"><h3>Run Payroll Engine</h3></div>
+                <div class="panel-body form-grid">
+                    {{ process_form.as_p }}
+                    <button class="button primary" type="submit">Calculate Payroll</button>
+                    <p class="muted small">Uses Attendance → Time Tracking → Tax rules. Never reads biometric devices.</p>
+                </div>
+            </form>
+            <form method="post" action="{% url 'payroll_period_action' object.pk %}" class="panel">
+                {% csrf_token %}
+                <div class="panel-header"><h3>Approval Workflow</h3></div>
+                <div class="panel-body form-grid">
+                    {{ approval_form.as_p }}
+                    <div class="row-actions" style="flex-wrap:wrap;gap:8px;">
+                        <button class="button primary" name="action" value="advance" type="submit">Advance Stage</button>
+                        <button class="button" name="action" value="payslips" type="submit">Generate Payslips</button>
+                        <button class="button subtle" name="action" value="unlock" type="submit">Unlock</button>
+                    </div>
+                    <p class="muted small">Draft → HR → Finance → Approved → Locked → Paid</p>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="panel" style="margin-top:16px;">
+    <div class="panel-header"><h2>Employee Payroll</h2><a class="button subtle" href="{% url 'payroll_list' %}?period={{ object.pk }}">Filter list</a></div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Employee</th><th>Gross</th><th>Tax</th><th>Net</th>
+                    <th>Worked</th><th>Expected</th><th>Missing</th><th>Status</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in payrolls %}
+                <tr>
+                    <td>{{ row.employee.full_name }}<div class="muted small">{{ row.employee.organization_id }}</div></td>
+                    <td>{{ row.gross_salary|floatformat:2|intcomma }}</td>
+                    <td>{{ row.income_tax|floatformat:2|intcomma }}</td>
+                    <td><strong>{{ row.net_salary|floatformat:2|intcomma }}</strong></td>
+                    <td>{{ row.worked_hours }}</td>
+                    <td>{{ row.expected_hours }}</td>
+                    <td>{{ row.missing_hours }}</td>
+                    <td><span class="badge">{{ row.get_status_display }}</span></td>
+                    <td class="row-actions">
+                        <a class="button subtle" href="{% url 'payroll_detail' row.pk %}">Detail</a>
+                        {% if row.payslip %}
+                            <a class="button subtle" href="{% url 'payroll_payslip' row.payslip.pk %}">Payslip</a>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="9" class="empty">No payroll calculated for this period yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

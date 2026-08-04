@@ -1,7 +1,7 @@
 import csv
 import json
 import logging
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.conf import settings
 from django.contrib.auth.models import Group, User
@@ -34,12 +34,14 @@ from .models import (
     AttendanceLog,
     AttendancePolicy,
     AttendanceRecord,
+    DailyTimeSummary,
     Employee,
     EmployeeSchedule,
     EnrollmentRequest,
     Holiday,
     LeaveBalance,
     LeaveRequest,
+    MonthlyTimeSummary,
     Notification,
     OvertimeRequest,
     RemoteWorkLog,
@@ -49,6 +51,7 @@ from .models import (
     SystemSetting,
 )
 from .services.attendance_engine import AttendanceEngine
+from .services.time_tracking_engine import TimeTrackingEngine
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +76,8 @@ class EnterpriseContextMixin:
             ('leave', 'Leave', 'leave_list'),
             ('holidays', 'Holidays', 'holiday_list'),
             ('overtime', 'Overtime', 'overtime_list'),
+            ('payroll', 'Payroll', 'payroll_dashboard'),
+            ('payroll_salaries', 'Salaries', 'payroll_salary_list'),
             ('remote', 'Remote Work', 'remote_list'),
             ('sites', 'Site Visits', 'site_list'),
             ('policies', 'Policies', 'policy_list'),
@@ -190,7 +195,7 @@ class DashboardView(EnterpriseContextMixin, TemplateView):
                 total=Sum('overtime_minutes')
             )['total'] or 0,
             'recent_logs': AttendanceLog.objects.select_related('employee', 'employee__department').order_by('-timestamp')[:8],
-            'department_stats': Department.objects.annotate(employee_total=Count('employee_set')).order_by('name')[:8],
+            'department_stats': Department.objects.annotate(employee_total=Count('employee')).order_by('name')[:8],
             'status_breakdown': records_today.values('status').annotate(total=Count('id')).order_by('status'),
             'notifications': Notification.objects.order_by('-created_at')[:5],
         })
@@ -284,7 +289,7 @@ class DepartmentListView(EnterpriseListMixin):
     export_fields = [('name', 'Name'), ('code', 'Code'), ('employee_count', 'Employees'), ('is_active', 'Active')]
 
     def get_queryset(self):
-        queryset = Department.objects.annotate(employee_count=Count('employee_set')).select_related('manager', 'company')
+        queryset = Department.objects.annotate(employee_count=Count('employee')).select_related('manager', 'company')
         query = self.request.GET.get('q', '').strip()
         if query:
             queryset = queryset.filter(Q(name__icontains=query) | Q(code__icontains=query))
@@ -910,3 +915,214 @@ class SmartLoginView(LoginView):
 
 class SmartLogoutView(LogoutView):
     next_page = 'login'
+
+
+# ---------------------------------------------------------------------------
+# Time Tracking Engine UI
+# ---------------------------------------------------------------------------
+
+
+class TimeTrackingDashboardView(EnterpriseContextMixin, TemplateView):
+    template_name = 'attendance/time_tracking_dashboard.html'
+    page_title = 'Time Tracking Dashboard'
+    active_nav = 'time_tracking'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        today = timezone.localdate()
+        employee_id = self.request.GET.get('employee')
+        
+        if employee_id:
+            employees = Employee.objects.filter(pk=employee_id)
+        else:
+            employees = Employee.objects.filter(
+                employment_status=Employee.EmploymentStatus.ACTIVE
+            ).select_related('department')[:50]
+
+        engine = TimeTrackingEngine()
+        summaries = []
+        for emp in employees:
+            stats = engine.get_dashboard_stats(emp, today)
+            summaries.append({
+                'employee': emp,
+                'today': stats['today'],
+                'week': stats['week'],
+                'month': stats['month'],
+            })
+
+        context.update({
+            'today': today,
+            'summaries': summaries,
+            'employees': Employee.objects.filter(
+                employment_status=Employee.EmploymentStatus.ACTIVE
+            ).select_related('department'),
+            'selected_employee_id': int(employee_id) if employee_id else None,
+        })
+        return context
+
+
+class TimeTrackingEmployeeDetailView(EnterpriseContextMixin, DetailView):
+    model = Employee
+    template_name = 'attendance/time_tracking_detail.html'
+    page_title = 'Time Tracking'
+    active_nav = 'time_tracking'
+
+    def get_queryset(self):
+        return Employee.objects.select_related('department', 'office_location')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        employee = self.object
+        today = timezone.localdate()
+        
+        date_from = self.request.GET.get('date_from')
+        date_to = self.request.GET.get('date_to')
+        
+        if not date_from:
+            date_from = today.replace(day=1)
+        else:
+            date_from = date.fromisoformat(date_from)
+        
+        if not date_to:
+            from calendar import monthrange
+            _, last_day = monthrange(today.year, today.month)
+            date_to = today.replace(day=last_day)
+        else:
+            date_to = date.fromisoformat(date_to)
+
+        engine = TimeTrackingEngine()
+        stats = engine.get_dashboard_stats(employee, today)
+        
+        daily_summaries = DailyTimeSummary.objects.filter(
+            employee=employee,
+            date__gte=date_from,
+            date__lte=date_to,
+        ).select_related('attendance_record').order_by('date')
+
+        monthly = MonthlyTimeSummary.objects.filter(
+            employee=employee,
+            year=date_from.year,
+            month=date_from.month,
+        ).first()
+
+        timeline = []
+        for ds in daily_summaries:
+            ar = ds.attendance_record
+            logs = []
+            if ar:
+                logs = AttendanceLog.objects.filter(
+                    employee=employee, timestamp__date=ds.date
+                ).order_by('timestamp')
+            
+            timeline.append({
+                'daily_summary': ds,
+                'attendance_record': ar,
+                'logs': logs,
+            })
+
+        context.update({
+            'today': today,
+            'date_from': date_from,
+            'date_to': date_to,
+            'stats': stats,
+            'daily_summaries': daily_summaries,
+            'monthly': monthly,
+            'timeline': timeline,
+        })
+        return context
+
+
+class TimeTrackingMonthlySummaryView(EnterpriseContextMixin, DetailView):
+    model = Employee
+    template_name = 'attendance/time_tracking_monthly.html'
+    page_title = 'Monthly Time Summary'
+    active_nav = 'time_tracking'
+
+    def get_queryset(self):
+        return Employee.objects.select_related('department', 'office_location')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        employee = self.object
+        
+        year = int(self.request.GET.get('year', timezone.localdate().year))
+        month = int(self.request.GET.get('month', timezone.localdate().month))
+
+        monthly = MonthlyTimeSummary.objects.filter(
+            employee=employee,
+            year=year,
+            month=month,
+        ).first()
+
+        from calendar import monthrange
+        _, last_day = monthrange(year, month)
+        start_date = date(year, month, 1)
+        end_date = date(year, month, last_day)
+
+        daily_summaries = DailyTimeSummary.objects.filter(
+            employee=employee,
+            date__gte=start_date,
+            date__lte=end_date,
+        ).select_related('attendance_record').order_by('date')
+
+        engine = TimeTrackingEngine()
+        timeline = engine.get_employee_timeline(employee, start_date, end_date)
+
+        context.update({
+            'year': year,
+            'month': month,
+            'monthly': monthly,
+            'daily_summaries': daily_summaries,
+            'timeline': timeline,
+            'month_name': start_date.strftime('%B %Y'),
+        })
+        return context
+
+
+class TimeTrackingAuditTrailView(EnterpriseContextMixin, DetailView):
+    model = Employee
+    template_name = 'attendance/time_tracking_audit.html'
+    page_title = 'Audit Trail'
+    active_nav = 'time_tracking'
+
+    def get_queryset(self):
+        return Employee.objects.select_related('department', 'office_location')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        employee = self.object
+        
+        payroll_id = self.request.GET.get('payroll_id')
+        
+        if payroll_id:
+            from payroll.models import Payroll
+            payroll = get_object_or_404(
+                Payroll.objects.select_related('period', 'salary_profile', 'employee'),
+                pk=payroll_id,
+                employee=employee
+            )
+            
+            period = payroll.period
+            start_date = period.start_date
+            end_date = period.end_date
+        else:
+            payroll = None
+            year = int(self.request.GET.get('year', timezone.localdate().year))
+            month = int(self.request.GET.get('month', timezone.localdate().month))
+            from calendar import monthrange
+            _, last_day = monthrange(year, month)
+            start_date = date(year, month, 1)
+            end_date = date(year, month, last_day)
+            period = None
+
+        engine = TimeTrackingEngine()
+        timeline = engine.get_employee_timeline(employee, start_date, end_date)
+
+        context.update({
+            'payroll': payroll,
+            'period': period,
+            'start_date': start_date,
+            'end_date': end_date,
+            'timeline': timeline,
+        })
+        return context

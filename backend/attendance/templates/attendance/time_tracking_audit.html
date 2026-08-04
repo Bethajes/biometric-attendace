@@ -1,0 +1,145 @@
+{% extends "attendance/base.html" %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>Audit Trail: {{ employee.full_name }}</h2>
+        <div class="table-actions">
+            <a class="button" href="{% url 'time_tracking_detail' employee.pk %}">Back to Employee Detail</a>
+            <a class="button" href="{% url 'time_tracking_monthly' employee.pk %}">Monthly Summary</a>
+        </div>
+    </div>
+    <div class="panel-body">
+        <div class="info-bar">
+            <div class="info-item">
+                <span class="info-label">Employee ID</span>
+                <span class="info-value">{{ employee.organization_id }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Department</span>
+                <span class="info-value">{{ employee.department|default:"-" }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Job Title</span>
+                <span class="info-value">{{ employee.job_title }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Period</span>
+                <span class="info-value">{{ start_date }} to {{ end_date }}</span>
+            </div>
+        </div>
+
+        {% if payroll %}
+        <div class="payroll-summary" style="background: #f5f9ff; border: 1px solid #cce0ff; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+            <h3 style="margin-top: 0;">Payroll: {{ payroll.period }} - Net: {{ payroll.currency }} {{ payroll.net_salary }}</h3>
+            <div class="stats-grid" style="margin-top: 12px;">
+                <div class="stat-card">
+                    <div class="stat-label">Basic Salary</div>
+                    <div class="stat-value">{{ payroll.currency }} {{ payroll.basic_salary }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Attendance Salary</div>
+                    <div class="stat-value">{{ payroll.currency }} {{ payroll.basic_salary }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Allowances</div>
+                    <div class="stat-value">{{ payroll.currency }} {{ payroll.total_allowances }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Bonuses</div>
+                    <div class="stat-value">{{ payroll.currency }} {{ payroll.total_bonuses }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Overtime</div>
+                    <div class="stat-value">{{ payroll.currency }} {{ payroll.total_overtime }}</div>
+                </div>
+                <div class="stat-card highlight">
+                    <div class="stat-label">Gross Salary</div>
+                    <div class="stat-value">{{ payroll.currency }} {{ payroll.gross_salary }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Income Tax</div>
+                    <div class="stat-value">{{ payroll.currency }} {{ payroll.income_tax }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Pension (Employee)</div>
+                    <div class="stat-value">{{ payroll.currency }} {{ payroll.pension_employee }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Gov Deductions</div>
+                    <div class="stat-value">{{ payroll.currency }} {{ payroll.total_government_deductions }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Company Deductions</div>
+                    <div class="stat-value">{{ payroll.currency }} {{ payroll.total_company_deductions }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Attendance Deductions</div>
+                    <div class="stat-value">{{ payroll.currency }} {{ payroll.attendance_deductions }}</div>
+                </div>
+                <div class="stat-card highlight">
+                    <div class="stat-label">Net Salary</div>
+                    <div class="stat-value">{{ payroll.currency }} {{ payroll.net_salary }}</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <h3>Complete Audit Trail: Net Salary → Fingerprint Events</h3>
+        
+        {% if timeline %}
+        <div class="audit-timeline">
+            {% for item in timeline %}
+            <div class="audit-level-{{ item.level }}" style="margin-bottom: 16px; padding: 12px; border-left: 4px solid 
+                {% if item.level == 'monthly_summary' %}#2563eb
+                {% elif item.level == 'daily_summary' %}#16a34a
+                {% elif item.level == 'attendance_record' %}#ea580c
+                {% elif item.level == 'attendance_event' %}#9333ea
+                {% else %}#6b7280
+                {% endif %}; background: #fafafa; border-radius: 4px;">
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <strong>{{ item.label }}</strong>
+                    <small style="color: #666;">{{ item.level|title|replace:"_"," " }}</small>
+                </div>
+                
+                <div class="audit-data" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; font-size: 13px;">
+                    {% for key, value in item.data.items %}
+                    <div>
+                        <span style="color: #666;">{{ key|title|replace:"_"," " }}:</span>
+                        <span style="font-weight: 500;">{{ value }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                {% if item.events %}
+                <details style="margin-top: 12px;">
+                    <summary style="cursor: pointer; font-weight: 500; color: #9333ea;">📋 {{ item.events|length }} Attendance Events</summary>
+                    <div style="margin-top: 8px; padding-left: 16px; border-left: 2px solid #e5e7eb;">
+                        {% for event in item.events %}
+                        <div class="audit-level-{{ event.level }}" style="margin: 8px 0; padding: 8px; background: white; border-radius: 4px;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <strong>{{ event.label }}</strong>
+                                <small>ID: {{ event.id }}</small>
+                            </div>
+                            <div class="audit-data" style="margin-top: 4px;">
+                                {% for key, value in event.data.items %}
+                                <div>
+                                    <span style="color: #666;">{{ key|title|replace:"_"," " }}:</span>
+                                    <span style="font-weight: 500;">{{ value }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </details>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">No audit trail data found for this period.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

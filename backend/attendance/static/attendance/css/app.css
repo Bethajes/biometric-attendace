@@ -757,3 +757,353 @@ tr:hover td { background: #f7f9fc; }
     min-height: auto;
     padding: 6px 10px;
 }
+
+/* =========================================================================
+   Salary Profile Form
+   ========================================================================= */
+
+.salary-form-layout {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 18px;
+    align-items: start;
+}
+
+.salary-form-main {
+    display: grid;
+    gap: 16px;
+}
+
+.salary-form-sidebar {
+    display: grid;
+    gap: 16px;
+    position: sticky;
+    top: 28px;
+}
+
+.salary-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.salary-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface-soft);
+}
+
+.salary-card-header h3 {
+    font-size: 0.92rem;
+    font-weight: 800;
+    flex: 1;
+}
+
+.card-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--info-bg);
+    font-size: 1rem;
+}
+
+.salary-card-body {
+    padding: 16px 18px;
+}
+
+/* Payment Type Selector */
+.payment-type-selector {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.pt-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 8px;
+    border: 2px solid var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.88rem;
+    transition: all 0.15s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.pt-option:hover {
+    border-color: var(--brand);
+    background: var(--info-bg);
+}
+
+.pt-option.active {
+    border-color: var(--brand);
+    background: var(--brand);
+    color: #fff;
+}
+
+.pt-option input {
+    display: none;
+}
+
+/* Source salary fields */
+.source-salary-section {
+    margin: 14px 0 8px;
+}
+
+.source-field {
+    transition: opacity 0.2s ease;
+}
+
+.input-with-currency {
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+
+.input-with-currency input {
+    border-radius: 0 8px 8px 0;
+    border-left: none;
+    flex: 1;
+}
+
+.currency-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    background: var(--surface-soft);
+    color: var(--muted);
+    font-weight: 800;
+    font-size: 0.82rem;
+}
+
+/* Computed fields grid */
+.computed-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-top: 0;
+}
+
+.computed-field label {
+    font-size: 0.72rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.readonly-value {
+    padding: 8px 10px;
+    background: var(--surface-soft);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--brand-dark);
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+}
+
+/* Field tip tooltip */
+.field-tip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--line);
+    color: var(--muted);
+    font-size: 0.65rem;
+    font-weight: 900;
+    cursor: help;
+    flex-shrink: 0;
+}
+
+/* Schedule fields */
+.schedule-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+/* Field group */
+.field-group {
+    display: grid;
+    gap: 5px;
+}
+
+.field-group label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.field-error {
+    color: var(--danger);
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+/* Salary Summary Card */
+.salary-summary-card .salary-card-body {
+    padding: 14px 18px;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+}
+
+.summary-label {
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.summary-value {
+    font-weight: 800;
+    font-size: 0.95rem;
+}
+
+.summary-divider {
+    height: 1px;
+    background: var(--line);
+    margin: 4px 0;
+}
+
+/* Payroll Preview Card */
+.preview-input {
+    min-height: 36px;
+    font-size: 0.95rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Enhanced preview sections */
+.preview-section {
+    margin-bottom: 14px;
+}
+
+.preview-section-title {
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 3px;
+}
+
+.preview-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+    font-size: 0.82rem;
+    gap: 8px;
+}
+
+.preview-row span:first-child {
+    color: var(--muted);
+    flex-shrink: 0;
+}
+
+.pv-val {
+    font-weight: 600;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.pv-val.pv-warn { color: var(--danger); }
+.pv-val.pv-highlight { color: var(--brand-dark); font-weight: 800; }
+.pv-val.pv-danger { color: var(--danger); }
+.pv-val.pv-net { color: var(--accent); font-weight: 900; font-size: 1.05rem; }
+
+.preview-row.pv-total {
+    border-top: 2px solid var(--brand);
+    margin-top: 4px;
+    padding-top: 6px;
+}
+
+.payroll-preview-card .salary-card-body {
+    padding: 12px 14px;
+}
+
+/* Collapsible Advanced Settings */
+.collapsible-header {
+    cursor: pointer;
+    user-select: none;
+}
+
+.collapsible-header:hover {
+    background: var(--surface-soft);
+}
+
+.collapse-icon {
+    font-size: 0.8rem;
+    color: var(--muted);
+    transition: transform 0.2s ease;
+}
+
+.advanced-body {
+    display: none;
+}
+
+.advanced-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.advanced-grid .full-width {
+    grid-column: 1 / -1;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+    .salary-form-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .salary-form-sidebar {
+        position: static;
+    }
+}
+
+@media (max-width: 760px) {
+    .computed-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .schedule-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .payment-type-selector {
+        grid-template-columns: 1fr;
+    }
+
+    .advanced-grid {
+        grid-template-columns: 1fr;
+    }
+}

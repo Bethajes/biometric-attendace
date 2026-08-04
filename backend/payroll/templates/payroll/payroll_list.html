@@ -1,0 +1,68 @@
+{% extends "attendance/base.html" %}
+{% load humanize %}
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>Employee Payroll</h2>
+        <a class="button primary" href="{% url 'payroll_period_list' %}">Periods</a>
+    </div>
+    <div class="panel-body">
+        <form class="filter-bar" method="get">
+            <label>Search<input name="q" value="{{ request.GET.q }}" placeholder="Employee"></label>
+            <label>Period
+                <select name="period">
+                    <option value="">All</option>
+                    {% for p in periods %}
+                        <option value="{{ p.id }}" {% if request.GET.period == p.id|stringformat:"s" %}selected{% endif %}>{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Department
+                <select name="department">
+                    <option value="">All</option>
+                    {% for d in departments %}
+                        <option value="{{ d.id }}" {% if request.GET.department == d.id|stringformat:"s" %}selected{% endif %}>{{ d.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>Status
+                <select name="status">
+                    <option value="">All</option>
+                    {% for value,label in status_choices %}
+                        <option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button class="button primary" type="submit">Apply</button>
+        </form>
+        <div class="table-actions" style="margin-bottom:12px;">
+            <a class="button" href="?{{ request.GET.urlencode }}{% if request.GET.urlencode %}&{% endif %}export=csv">CSV</a>
+            <a class="button" href="?{{ request.GET.urlencode }}{% if request.GET.urlencode %}&{% endif %}export=excel">Excel</a>
+            <a class="button" href="?{{ request.GET.urlencode }}{% if request.GET.urlencode %}&{% endif %}export=pdf">PDF</a>
+        </div>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>Employee</th><th>Period</th><th>Gross</th><th>Net</th><th>Hours</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+            {% for row in object_list %}
+                <tr>
+                    <td>{{ row.employee.full_name }}</td>
+                    <td>{{ row.period }}</td>
+                    <td>{{ row.currency }} {{ row.gross_salary|floatformat:2|intcomma }}</td>
+                    <td><strong>{{ row.currency }} {{ row.net_salary|floatformat:2|intcomma }}</strong></td>
+                    <td>{{ row.worked_hours }} / {{ row.expected_hours }}</td>
+                    <td><span class="badge">{{ row.get_status_display }}</span></td>
+                    <td class="row-actions"><a class="button subtle" href="{% url 'payroll_detail' row.pk %}">Open</a></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="empty">No payroll records match filters.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "attendance/_pagination.html" %}
+</div>
+{% endblock %}
