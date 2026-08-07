@@ -229,6 +229,10 @@ class EmployeeListView(EnterpriseListMixin):
             queryset = queryset.filter(employment_status=status)
         return queryset
 
+    def get_sort_fields(self):
+        fields = super().get_sort_fields()
+        return ['first_name' if field == 'full_name' else field for field in fields]
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['departments'] = Department.objects.filter(is_active=True)

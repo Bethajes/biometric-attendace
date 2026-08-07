@@ -149,3 +149,6 @@ turtlesim==1.8.3
 type-description-interfaces==2.0.3
 unique-identifier-msgs==2.5.0
 visualization-msgs==5.3.7
+Pillow==10.4.0
+Pillow>=10.0.0
+whitenoise>=6.0.0

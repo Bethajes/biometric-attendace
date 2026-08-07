@@ -25,8 +25,8 @@
             <div class="info-item">
                 <span class="info-label">Status</span>
                 <span class="info-value">
-                    {% if monthly_summary.recalculation_count > 0 %}
-                    <span class="badge warning">Recalculated {{ monthly_summary.recalculation_count }} times</span>
+                    {% if monthly.recalculation_count > 0 %}
+                    <span class="badge warning">Recalculated {{ monthly.recalculation_count }} times</span>
                     {% else %}
                     <span class="badge success">Original</span>
                     {% endif %}
@@ -37,67 +37,67 @@
         <div class="stats-grid">
             <div class="stat-card highlight">
                 <div class="stat-label">Worked Hours</div>
-                <div class="stat-value">{{ monthly_summary.worked_hours }}h</div>
+                <div class="stat-value">{{ monthly.worked_hours }}h</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Expected Hours</div>
-                <div class="stat-value">{{ monthly_summary.expected_hours }}h</div>
+                <div class="stat-value">{{ monthly.expected_hours }}h</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Attendance %</div>
-                <div class="stat-value">{{ monthly_summary.attendance_percentage }}%</div>
+                <div class="stat-value">{{ monthly.attendance_percentage }}%</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Late Minutes</div>
-                <div class="stat-value">{{ monthly_summary.late_minutes }}m</div>
+                <div class="stat-value">{{ monthly.late_minutes }}m</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Missing Hours</div>
-                <div class="stat-value">{{ monthly_summary.missing_hours }}h</div>
+                <div class="stat-value">{{ monthly.missing_hours }}h</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Overtime Hours</div>
-                <div class="stat-value">{{ monthly_summary.overtime_hours }}h</div>
+                <div class="stat-value">{{ monthly.overtime_hours }}h</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Holiday Hours</div>
-                <div class="stat-value">{{ monthly_summary.holiday_hours }}h</div>
+                <div class="stat-value">{{ monthly.holiday_hours }}h</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Weekend Hours</div>
-                <div class="stat-value">{{ monthly_summary.weekend_hours }}h</div>
+                <div class="stat-value">{{ monthly.weekend_hours }}h</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Night Shift Hours</div>
-                <div class="stat-value">{{ monthly_summary.night_hours }}h</div>
+                <div class="stat-value">{{ monthly.night_hours }}h</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Approved Leave Hours</div>
-                <div class="stat-value">{{ monthly_summary.approved_leave_hours }}h</div>
+                <div class="stat-value">{{ monthly.approved_leave_hours }}h</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Unpaid Leave Hours</div>
-                <div class="stat-value">{{ monthly_summary.unpaid_leave_hours }}h</div>
+                <div class="stat-value">{{ monthly.unpaid_leave_hours }}h</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Paid Leave Hours</div>
-                <div class="stat-value">{{ monthly_summary.paid_leave_hours }}h</div>
+                <div class="stat-value">{{ monthly.paid_leave_hours }}h</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Present Days</div>
-                <div class="stat-value">{{ monthly_summary.present_days }}</div>
+                <div class="stat-value">{{ monthly.present_days }}</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Absent Days</div>
-                <div class="stat-value">{{ monthly_summary.absent_days }}</div>
+                <div class="stat-value">{{ monthly.absent_days }}</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Paid Leave Days</div>
-                <div class="stat-value">{{ monthly_summary.paid_leave_days }}</div>
+                <div class="stat-value">{{ monthly.paid_leave_days }}</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Unpaid Leave Days</div>
-                <div class="stat-value">{{ monthly_summary.unpaid_leave_days }}</div>
+                <div class="stat-value">{{ monthly.unpaid_leave_days }}</div>
             </div>
         </div>
 

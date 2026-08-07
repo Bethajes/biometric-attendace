@@ -8,7 +8,7 @@ Aggregates into MonthlyTimeSummary for Payroll Engine consumption.
 Never reads raw attendance events in Payroll — only reads MonthlyTimeSummary.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
@@ -448,33 +448,35 @@ class TimeTrackingEngine:
         if holiday:
             if check_in and check_out:
                 worked = self._worked_minutes(check_in, check_out)
-                calc = calc.__class__(
-                    **{**calc.__dict__, 'worked_minutes': worked, 'holiday_minutes': worked,
-                       'overtime_minutes': worked, 'check_in': check_in, 'check_out': check_out}
+                calc = replace(
+                    calc,
+                    worked_minutes=worked,
+                    holiday_minutes=worked,
+                    overtime_minutes=worked,
                 )
             return calc
 
         if leave:
-            calc.expected_minutes = 0
+            calc = replace(calc, expected_minutes=0)
             return calc
 
         if not schedule:
             if check_in and check_out:
                 worked = self._worked_minutes(check_in, check_out)
-                calc = calc.__class__(
-                    **{**calc.__dict__, 'worked_minutes': worked, 'check_in': check_in, 'check_out': check_out}
-                )
-            calc.expected_minutes = 0
+                calc = replace(calc, worked_minutes=worked)
+            calc = replace(calc, expected_minutes=0)
             return calc
 
         if not schedule.works_on(work_date):
             if check_in and check_out:
                 worked = self._worked_minutes(check_in, check_out)
-                calc = calc.__class__(
-                    **{**calc.__dict__, 'worked_minutes': worked, 'weekend_minutes': worked,
-                       'overtime_minutes': worked, 'check_in': check_in, 'check_out': check_out}
+                calc = replace(
+                    calc,
+                    worked_minutes=worked,
+                    weekend_minutes=worked,
+                    overtime_minutes=worked,
                 )
-            calc.expected_minutes = 0
+            calc = replace(calc, expected_minutes=0)
             return calc
 
         if not check_in:
@@ -561,7 +563,7 @@ class TimeTrackingEngine:
 
         if calc.expected_minutes > 0:
             pct = (Decimal(calc.worked_minutes) / Decimal(calc.expected_minutes) * 100).quantize(TWOPLACES)
-            calc = calc.__class__(**{**calc.__dict__, 'attendance_percentage': min(pct, Decimal('100.00'))})
+            calc = replace(calc, attendance_percentage=min(pct, Decimal('100.00')))
 
         return calc
 

@@ -2,7 +2,7 @@ from datetime import date, datetime, time
 
 from django.test import TestCase
 from django.utils import timezone
-from organizations.models import Department
+from organizations.models import Company, Department
 
 from .models import (
     AttendanceLog,
@@ -18,7 +18,8 @@ from .services.attendance_engine import AttendanceEngine
 
 class AttendanceEngineTests(TestCase):
     def setUp(self):
-        self.department = Department.objects.create(name='Engineering', code='ENG')
+        self.company = Company.objects.create(name='Test Corp', slug='test-corp')
+        self.department = Department.objects.create(name='Engineering', code='ENG', company=self.company)
         self.employee = Employee.objects.create(
             organization_id='EMP-001',
             first_name='Maya',

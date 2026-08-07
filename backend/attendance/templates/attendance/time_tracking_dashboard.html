@@ -5,102 +5,48 @@
         <h2>Time Tracking Dashboard</h2>
     </div>
     <div class="panel-body">
-        <div class="info-bar">
-            <div class="info-item">
-                <span class="info-label">Employee</span>
-                <span class="info-value">{{ employee.full_name }}</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Employee ID</span>
-                <span class="info-value">{{ employee.organization_id }}</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Department</span>
-                <span class="info-value">{{ employee.department|default:"-" }}</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Job Title</span>
-                <span class="info-value">{{ employee.job_title }}</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">Date</span>
-                <span class="info-value">{{ today }}</span>
-            </div>
-        </div>
+        <form class="filter-bar" method="get">
+            <label>Employee<select name="employee"><option value="">All active employees</option>{% for emp in employees %}<option value="{{ emp.id }}" {% if selected_employee_id == emp.id %}selected{% endif %}>{{ emp.full_name }} ({{ emp.organization_id }})</option>{% endfor %}</select></label>
+            <button class="button primary" type="submit">Apply</button><a class="button subtle" href="{% url 'time_tracking_dashboard' %}">Reset</a>
+        </form>
 
-        <div class="stats-grid">
-            <div class="stat-card highlight">
-                <div class="stat-label">Today's Worked Hours</div>
-                <div class="stat-value">
-                    {% if today_ds %}
-                    {{ today_ds.worked_minutes|divisibleby:"60"|yesno:"'Xh Ym',today_ds.worked_minutes|add:'m'" }}
-                    {% else %}
-                    0m
-                    {% endif %}
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Weekly Hours</div>
-                <div class="stat-value">{{ weekly_hours }}h</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Monthly Hours</div>
-                <div class="stat-value">{{ monthly_hours }}h</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Expected Hours (Month)</div>
-                <div class="stat-value">{{ monthly_expected }}h</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Attendance %</div>
-                <div class="stat-value">{{ monthly_attendance_pct }}%</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Late Minutes (Month)</div>
-                <div class="stat-value">{{ monthly_late }}m</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Early Leave (Month)</div>
-                <div class="stat-value">{{ monthly_early_leave }}m</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Overtime (Month)</div>
-                <div class="stat-value">{{ monthly_overtime }}h</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Missing Hours (Month)</div>
-                <div class="stat-value">{{ monthly_missing }}h</div>
-            </div>
-        </div>
-
-        {% if today_ds %}
-        <h3 style="margin-top: 24px;">Today's Timeline</h3>
+        {% if summaries %}
         <div class="table-wrap">
             <table>
                 <thead>
                     <tr>
-                        <th>Time</th>
-                        <th>Event Type</th>
-                        <th>Method</th>
-                        <th>Device</th>
-                        <th>Status</th>
+                        <th>Employee</th>
+                        <th>Today Worked</th>
+                        <th>Today Expected</th>
+                        <th>Week Worked</th>
+                        <th>Month Worked</th>
+                        <th>Month Expected</th>
+                        <th>Month Late</th>
+                        <th>Month OT</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for log in today_logs %}
+                    {% for summary in summaries %}
                     <tr>
-                        <td>{{ log.timestamp|time:"H:i" }}</td>
-                        <td>{{ log.get_event_type_display }}</td>
-                        <td>{{ log.get_biometric_method_display }}</td>
-                        <td>{{ log.device.name|default:"-" }}</td>
-                        <td><span class="badge {% if log.verification_status == 'VERIFIED' %}success{% elif log.verification_status == 'FAILED' %}danger{% else %}warning{% endif %}">{{ log.get_verification_status_display }}</span></td>
+                        <td><div class="person-cell"><span class="avatar">{{ summary.employee.first_name|slice:":1" }}{{ summary.employee.last_name|slice:":1" }}</span><div><strong>{{ summary.employee.full_name }}</strong><div class="muted small">{{ summary.employee.department|default:"Unassigned" }} &middot; {{ summary.employee.organization_id }}</div></div></div></td>
+                        <td>{{ summary.today.worked_hours }}h</td>
+                        <td>{{ summary.today.expected_hours }}h</td>
+                        <td>{{ summary.week.worked_hours }}h</td>
+                        <td>{{ summary.month.worked_hours }}h</td>
+                        <td>{{ summary.month.expected_hours }}h</td>
+                        <td>{{ summary.month.late_minutes }}m</td>
+                        <td>{{ summary.month.overtime_hours }}h</td>
+                        <td class="row-actions"><a class="button subtle" href="{% url 'time_tracking_detail' summary.employee.pk %}">Detail</a><a class="button subtle" href="{% url 'time_tracking_monthly' summary.employee.pk today.year today.month %}">Monthly</a></td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="5" class="empty">No attendance events today</td></tr>
+                    <tr><td colspan="9" class="empty">No active employees found.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        {% else %}
+        <p class="empty">No employees to display.</p>
         {% endif %}
     </div>
 </div>

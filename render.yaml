@@ -1,0 +1,19 @@
+services:
+  - type: web_service
+    name: smartattend-web
+    env: docker
+    dockerfilePath: Dockerfile
+    branch: main
+    buildCommand: ""
+    startCommand: ""
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DEBUG
+        value: 'False'
+      - key: REDIS_URL
+        value: redis://localhost:6379/0
+      - key: DATABASE_URL
+        value: postgresql://user:password@host:5432/dbname
+      - key: SECRET_KEY
+        value: replace-with-secret

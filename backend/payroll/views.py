@@ -434,7 +434,17 @@ class PayslipDetailView(PayrollPermissionMixin, PayrollNavMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['snapshot'] = self.object.snapshot_json or {}
+        snapshot = self.object.snapshot_json or {}
+        attendance_pct = None
+        try:
+            expected = float(snapshot.get('expected_hours') or 0)
+            worked = float(snapshot.get('worked_hours') or 0)
+            if expected:
+                attendance_pct = round((worked / expected) * 100, 1)
+        except (TypeError, ValueError):
+            attendance_pct = None
+        context['snapshot'] = snapshot
+        context['attendance_pct'] = attendance_pct
         context['print_mode'] = self.request.GET.get('print') == '1'
         log_payroll_action(
             action='VIEW',

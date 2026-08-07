@@ -1,11 +1,12 @@
 {% extends "attendance/base.html" %}
+{% load extra_filters %}
 {% block content %}
 <div class="panel">
     <div class="panel-header">
         <h2>Audit Trail: {{ employee.full_name }}</h2>
         <div class="table-actions">
             <a class="button" href="{% url 'time_tracking_detail' employee.pk %}">Back to Employee Detail</a>
-            <a class="button" href="{% url 'time_tracking_monthly' employee.pk %}">Monthly Summary</a>
+            <a class="button" href="{% url 'time_tracking_monthly' employee.pk start_date.year start_date.month %}">Monthly Summary</a>
         </div>
     </div>
     <div class="panel-body">
@@ -99,13 +100,13 @@
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <strong>{{ item.label }}</strong>
-                    <small style="color: #666;">{{ item.level|title|replace:"_"," " }}</small>
+                    <small style="color: #666;">{{ item.level|title|replace:"_| " }}</small>
                 </div>
                 
                 <div class="audit-data" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; font-size: 13px;">
                     {% for key, value in item.data.items %}
                     <div>
-                        <span style="color: #666;">{{ key|title|replace:"_"," " }}:</span>
+                        <span style="color: #666;">{{ key|title|replace:"_| " }}:</span>
                         <span style="font-weight: 500;">{{ value }}</span>
                     </div>
                     {% endfor %}
@@ -124,7 +125,7 @@
                             <div class="audit-data" style="margin-top: 4px;">
                                 {% for key, value in event.data.items %}
                                 <div>
-                                    <span style="color: #666;">{{ key|title|replace:"_"," " }}:</span>
+                                    <span style="color: #666;">{{ key|title|replace:"_| " }}:</span>
                                     <span style="font-weight: 500;">{{ value }}</span>
                                 </div>
                                 {% endfor %}
