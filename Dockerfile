@@ -14,5 +14,5 @@ COPY device_client/ /app/device_client/
 ENV DJANGO_SETTINGS_MODULE=config.settings.production
 
 EXPOSE 8000
-
+RUN python backend/manage.py collectstatic --noinput
 CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "config.asgi:application"]
